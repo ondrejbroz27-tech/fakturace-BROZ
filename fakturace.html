@@ -371,26 +371,54 @@ function ConfirmDialog({ message, onYes, onNo }) {
 // PrintModal — zobrazí dokument přes celou obrazovku
 // Uživatel tiskne přímo přes prohlížeč: Ctrl+P (PC) nebo Sdílet→Tisknout (mobil)
 function PrintModal({ html, title, onClose }) {
-    if (!html)
-        return null;
-    // Detekce mobilu
+    if (!html) return null;
     const isMob = /iPhone|iPad|Android/i.test(navigator.userAgent);
-    return (React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 4000, display: "flex", flexDirection: "column",
-            background: "#1a3a5c" } },
+    const canShare = isMob && !!navigator.share;
+
+    const doShare = async () => {
+        try {
+            // Vytvoř soubor pro sdílení
+            const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+            const file = new File([blob], title.replace(/[^a-z0-9]/gi,"_") + ".html", { type: "text/html" });
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({ files: [file], title: title });
+            } else {
+                // Fallback: stáhnout soubor
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url; a.download = title.replace(/[^a-z0-9]/gi,"_") + ".html";
+                document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(url), 5000);
+            }
+        } catch(e) { console.log("Share cancelled or failed:", e); }
+    };
+
+    return React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 4000, display: "flex", flexDirection: "column", background: "#1a3a5c" } },
+        // Toolbar
         React.createElement("div", { style: { background: "#1a3a5c", padding: "10px 16px", flexShrink: 0,
-                display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" } },
-            React.createElement("span", { style: { color: "#fff", fontWeight: "700", fontSize: "14px", flex: 1 } },
-                "\uD83D\uDCC4 ",
-                title),
-            React.createElement("div", { style: { flexShrink: 0, background: "#fffbeb", border: "1px solid #fcd34d",
-                    borderRadius: "8px", padding: "6px 12px", fontSize: "12px", color: "#92400e",
-                    fontWeight: "600", textAlign: "center" } }, isMob
-                ? "📱 Stiskněte ⋮ nebo □ → Sdílet → Tisknout / Uložit PDF"
-                : "🖥️ Pro tisk: Ctrl+P nebo pravé tlačítko → Tisk"),
-            React.createElement("button", { onClick: onClose, style: { flexShrink: 0, padding: "8px 14px", background: "rgba(255,255,255,0.15)",
-                    color: "#fff", border: "1px solid rgba(255,255,255,0.3)", borderRadius: "8px",
-                    fontSize: "13px", cursor: "pointer", fontWeight: "600" } }, "\u2715 Zav\u0159\u00EDt")),
-        React.createElement("div", { style: { flex: 1, overflow: "auto", background: "#fff" }, dangerouslySetInnerHTML: { __html: html } })));
+                display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px",
+                flexWrap: "wrap" } },
+            React.createElement("span", { style: { color: "#fff", fontWeight: "700", fontSize: "14px" } }, "\uD83D\uDCC4 " + title),
+            React.createElement("div", { style: { display: "flex", gap: "8px", alignItems: "center" } },
+                isMob
+                    ? React.createElement("button", {
+                        onClick: doShare,
+                        style: { padding: "10px 18px", background: "#16a34a", color: "#fff", border: "none",
+                            borderRadius: "8px", fontWeight: "700", fontSize: "14px", cursor: "pointer" }
+                      }, "\uD83D\uDCF1 Sdílet / Tisknout")
+                    : React.createElement("div", { style: { background: "#fffbeb", border: "1px solid #fcd34d",
+                            borderRadius: "8px", padding: "7px 14px", fontSize: "12px", color: "#92400e", fontWeight: "600" } },
+                        "\uD83D\uDDA5\uFE0F Ctrl+P nebo pravé tlačítko \u2192 Tisk"),
+                React.createElement("button", { onClick: onClose,
+                    style: { padding: "10px 14px", background: "rgba(255,255,255,0.15)", color: "#fff",
+                        border: "1px solid rgba(255,255,255,0.3)", borderRadius: "8px",
+                        fontSize: "13px", cursor: "pointer", fontWeight: "600" } }, "\u2715 Zav\u0159\u00EDt")
+            )
+        ),
+        // Dokument
+        React.createElement("div", { style: { flex: 1, overflow: "auto", background: "#fff" },
+            dangerouslySetInnerHTML: { __html: html } })
+    );
 }
 const Card = ({ children, style, onClick }) => (React.createElement("div", { onClick: onClick, style: Object.assign(Object.assign({ background: "#fff", borderRadius: "10px", padding: "20px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)", border: "1px solid #e5e7eb" }, (onClick ? { cursor: "pointer" } : {})), style) }, children));
 const StatCard = ({ label, value, color, sub }) => (React.createElement(Card, { style: { textAlign: "center" } },
@@ -565,6 +593,61 @@ async function createWeeklyBackupIfNeeded(dataObj) {
         console.warn("Záloha se nezdařila:", e);
     }
 }
+// Kompaktní Drive tlačítko pro mobilní horní lištu
+function MobileDriveBtn({ data, updateData, notify }) {
+    const [status, setStatus] = (0, useState)("idle");
+    const hasClientId = GDRIVE_CLIENT_ID !== "VLOZ_SEM_TVUJ_GOOGLE_CLIENT_ID" && GDRIVE_CLIENT_ID.length > 10;
+    if (!hasClientId) return null;
+    const connect = () => {
+        setStatus("loading");
+        loadGapiScript(async () => {
+            try {
+                await initGapi();
+                loadGisScript(() => {
+                    const tc = window.google.accounts.oauth2.initTokenClient({
+                        client_id: GDRIVE_CLIENT_ID,
+                        scope: GDRIVE_SCOPES,
+                        callback: async (resp) => {
+                            if (resp.error) { setStatus("error"); return; }
+                            try {
+                                const driveData = await loadFromDrive();
+                                if (driveData) { updateData(driveData); notify("✅ Data načtena z Drive!"); }
+                                else { await saveToDrive(data); notify("✅ Uloženo na Drive!"); }
+                                tokenClient = tc;
+                                setStatus("connected");
+                            } catch(e) { setStatus("error"); }
+                        },
+                    });
+                    tc.requestAccessToken();
+                });
+            } catch(e) { setStatus("error"); }
+        });
+    };
+    const syncNow = async () => {
+        setStatus("loading");
+        try {
+            await saveToDrive(data);
+            await createWeeklyBackupIfNeeded(data);
+            setStatus("connected");
+            notify("✅ Drive sync OK");
+        } catch(e) { setStatus("error"); }
+    };
+    // Auto-save každých 30s
+    (0, useEffect)(() => {
+        if (status !== "connected") return;
+        const iv = setInterval(() => syncNow(), 30000);
+        return () => clearInterval(iv);
+    }, [status, data]);
+    const label = status === "loading" ? "⏳" : status === "connected" ? "✅" : status === "error" ? "❌" : "☁️";
+    return React.createElement("button", {
+        onClick: status === "connected" ? syncNow : connect,
+        title: status === "connected" ? "Synchronizovat Drive" : "Připojit Google Drive",
+        style: { background: status === "connected" ? "rgba(34,197,94,0.3)" : "rgba(255,255,255,0.15)",
+            border: "none", color: "#fff", borderRadius: "8px", padding: "6px 10px",
+            fontSize: "14px", cursor: "pointer" }
+    }, label);
+}
+
 function GoogleDriveBtn({ data, updateData, notify }) {
     const [status, setStatus] = (0, useState)("idle"); // idle | loading | connected | error | noClientId
     const [lastSync, setLastSync] = (0, useState)(null);
@@ -771,7 +854,8 @@ function App() {
                             padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: "600", maxWidth: "140px",
                             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, notification.msg)),
                     React.createElement("button", { onClick: () => exportToFile(data), style: { background: "rgba(255,255,255,0.15)", border: "none", color: "#fff",
-                            borderRadius: "8px", padding: "6px 10px", fontSize: "12px", cursor: "pointer" } }, "\uD83D\uDCBE"))),
+                            borderRadius: "8px", padding: "6px 10px", fontSize: "12px", cursor: "pointer" } }, "\uD83D\uDCBE"),
+                    React.createElement(MobileDriveBtn, { data: data, updateData: updateData, notify: notify }))),
             React.createElement("div", { style: { flex: 1, overflow: "auto", padding: "16px", paddingBottom: "80px" } }, renderContent()),
             React.createElement("div", { style: { position: "fixed", bottom: 0, left: 0, right: 0, background: "#1a3a5c",
                     display: "flex", zIndex: 200, borderTop: "1px solid rgba(255,255,255,0.1)",
@@ -2447,6 +2531,22 @@ function Nemovitosti({ data, updateData, notify }) {
 // ============================================================
 // // NASTAVENI
 // ============================================================
+function ConfirmDialog2Btn({ label, message, onConfirm }) {
+    const [asking, setAsking] = (0, useState)(false);
+    if (!asking) {
+        return React.createElement(Btn, { onClick: () => setAsking(true), variant: "danger" }, label);
+    }
+    return React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "10px" } },
+        React.createElement("div", { style: { background: "#fff3cd", border: "1px solid #ffc107", borderRadius: "8px",
+                padding: "10px 14px", fontSize: "13px", color: "#856404", fontWeight: "600" } },
+            "\u26A0\uFE0F " + message),
+        React.createElement("div", { style: { display: "flex", gap: "8px" } },
+            React.createElement(Btn, { onClick: () => { onConfirm(); setAsking(false); }, variant: "danger" }, "\u2705 Ano, smazat"),
+            React.createElement(Btn, { onClick: () => setAsking(false), variant: "secondary" }, "Zru\u0161it")
+        )
+    );
+}
+
 function Nastaveni({ data, updateData, notify }) {
     const [firma, setFirma] = (0, useState)(data.firma);
     const save = () => {
@@ -2497,6 +2597,25 @@ function Nastaveni({ data, updateData, notify }) {
                     "4. Z mobilu p\u0159istupujte p\u0159es aplikaci Google Drive"),
                 React.createElement("div", { style: { marginTop: "12px" } },
                     React.createElement(Btn, { onClick: () => exportToFile(data) }, "\uD83D\uDCBE St\u00E1hnout z\u00E1lohu"))),
+            React.createElement(Card, { style: { background: "#fee2e2", border: "1px solid #fca5a5", marginBottom: "16px" } },
+                React.createElement("h3", { style: { marginTop: 0, color: "#dc2626" } }, "\uD83D\uDDD1\uFE0F Vymazat testovací záznamy"),
+                React.createElement("p", { style: { fontSize: "13px", color: "#6b7280", marginBottom: "12px", lineHeight: "1.6" } },
+                    "Smaže všechny demo faktury, zákazníky, nemovitosti a majetek. Nastavení firmy zůstane zachováno. Tato akce je nevratná."),
+                React.createElement(ConfirmDialog2Btn, {
+                    label: "\uD83D\uDDD1\uFE0F Vymazat testovací data",
+                    message: "Opravdu smazat všechna testovací data? Nastavení firmy zůstane.",
+                    onConfirm: () => {
+                        updateData(prev => ({
+                            ...prev,
+                            faktury: [],
+                            zakaznici: [],
+                            majetek: [],
+                            danNaklady: {},
+                            nemovitosti: { properties: [] },
+                        }));
+                        notify("\u2705 Testovací data smazána!");
+                    }
+                })),
             React.createElement(Card, { style: { background: "#f0fdf4", border: "1px solid #86efac" } },
                 React.createElement("h3", { style: { marginTop: 0, color: "#15803d" } },
                     "\u2705 Da\u0148ov\u00E9 parametry \u010CR ",
