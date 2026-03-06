@@ -35,6 +35,16 @@ const DPH_SAZBY = {
     snizena1: 12, // snížená sazba 1 (potraviny, restaurace, ubytování)
     snizena2: 0, // osvobozené plnění
 };
+const SP_ZP_MIN = {
+    2024: { sp: 3210, zp: 2722 },
+    2025: { sp: 4759, zp: 3143 },
+    2026: { sp: 5720, zp: 3306 },
+};
+const SP_SAZBA = 0.292;  // 29.2% z vyměřovacího základu
+const SP_VZ_PODIL = 0.55; // VZ = 55% daňového základu
+const ZP_SAZBA = 0.135;  // 13.5% z vyměřovacího základu
+const ZP_VZ_PODIL = 0.50; // VZ = 50% daňového základu
+
 const DAN_Z_PRIJMU_FO = {
     sazba15: 15, // do 36násobku průměrné mzdy (2024: 1 582 812 Kč)
     sazba23: 23, // nad 36násobek průměrné mzdy
@@ -68,22 +78,43 @@ const generateInvoiceNumber = (invoices, prefix = "FV") => {
 // ============================================================
 const initialState = {
     firma: {
-        nazev: "Jan Novotny OSVC",
-        ico: "12345678",
-        dic: "CZ8001011234",
-        ulice: "Korunni 15",
-        mesto: "Praha 2",
-        psc: "12000",
-        banka: "1234567890/0800",
-        email: "jan.novotny@email.cz",
-        telefon: "+420 603 123 456",
-        platceDPH: true,
+        nazev: "",
+        ico: "",
+        dic: "",
+        ulice: "",
+        mesto: "",
+        psc: "",
+        banka: "",
+        email: "",
+        telefon: "",
+        platceDPH: false,
         splatnost: 14,
     },
+    zakaznici: [],
+    faktury: [],
+    polozkyMaterialy: [],
+    majetek: [],
+    danNaklady: {},
+    prijateFaktury: [],
+    dodavatele: [],
+    metodaVydaju: "pausal",
+    najemnici: [],
+    nemovitosti: { properties: [] },
+}
+// ============================================================
+// UKÁZKOVÁ DATA (načtou se jen na vyžádání)
+// ============================================================
+const sampleData = {
+    firma: {
+        nazev: "Jan Novotny OSVC", ico: "12345678", dic: "CZ8001011234",
+        ulice: "Korunni 15", mesto: "Praha 2", psc: "12000",
+        banka: "1234567890/0800", email: "jan.novotny@email.cz",
+        telefon: "+420 603 123 456", platceDPH: true, splatnost: 14,
+    },
     zakaznici: [
-        { id: "zak1", nazev: "Acme s.r.o.", ico: "11223344", dic: "CZ11223344", ulice: "Obchodni 5", mesto: "Praha 1", psc: "11000", email: "info@acme.cz", telefon: "+420 222 333 444", poznamka: "Klic zakaznik" },
-        { id: "zak2", nazev: "Beta Technologies a.s.", ico: "55667788", dic: "CZ55667788", ulice: "Technicka 12", mesto: "Brno", psc: "60200", email: "office@beta.cz", telefon: "+420 533 444 555", poznamka: "" },
-        { id: "zak3", nazev: "Gamma Design s.r.o.", ico: "99001122", dic: "CZ99001122", ulice: "Kreativni 3", mesto: "Praha 2", psc: "12000", email: "hello@gamma.cz", telefon: "+420 211 222 333", poznamka: "" },
+        { id: "zak1", aktivni: true, nazev: "Acme s.r.o.", ico: "11223344", dic: "CZ11223344", ulice: "Obchodni 5", mesto: "Praha 1", psc: "11000", email: "info@acme.cz", telefon: "+420 222 333 444", poznamka: "Klic zakaznik" },
+        { id: "zak2", aktivni: true, nazev: "Beta Technologies a.s.", ico: "55667788", dic: "CZ55667788", ulice: "Technicka 12", mesto: "Brno", psc: "60200", email: "office@beta.cz", telefon: "+420 533 444 555", poznamka: "" },
+        { id: "zak3", aktivni: true, nazev: "Gamma Design s.r.o.", ico: "99001122", dic: "CZ99001122", ulice: "Kreativni 3", mesto: "Praha 2", psc: "12000", email: "hello@gamma.cz", telefon: "+420 211 222 333", poznamka: "" },
     ],
     faktury: [
         { id: "fak1", cislo: "FV20250001", zakaznikId: "zak1", zakaznikNazev: "Acme s.r.o.", datumVystaveni: "2025-01-10", datumSplatnosti: "2025-01-24", datumUskutecneni: "2025-01-10", stav: "uhrazena", poznamka: "Vyvoj software Q1", polozky: [{ id: "p1", popis: "Vyvoj webove aplikace", mnozstvi: 40, jednotka: "hod", cena: 1500, sazba: 21 }, { id: "p2", popis: "Konzultace", mnozstvi: 5, jednotka: "hod", cena: 2000, sazba: 21 }] },
@@ -96,15 +127,38 @@ const initialState = {
     polozkyMaterialy: [],
     majetek: [],
     danNaklady: {},
+    prijateFaktury: [
+        { id: "pf1", cislo: "FAK-2025-001", dodavatelNazev: "O2 Czech Republic", dodavatelIco: "60193336", datumPrijeti: "2025-01-15", datumSplatnosti: "2025-02-14", datumUskutecneni: "2025-01-15", castka: 826, dph: 174, celkem: 1000, sazba: 21, stav: "zaplacena", popis: "Internet a telefon leden", uplatnit: true },
+        { id: "pf2", cislo: "FAK-2025-102", dodavatelNazev: "Microsoft s.r.o.", dodavatelIco: "47123737", datumPrijeti: "2025-02-01", datumSplatnosti: "2025-03-01", datumUskutecneni: "2025-02-01", castka: 2479, dph: 521, celkem: 3000, sazba: 21, stav: "zaplacena", popis: "Microsoft 365 roční licence", uplatnit: true },
+    ],
+    dodavatele: [],
+    metodaVydaju: "pausal",
+    najemnici: [
+        { id: "najN1", jmeno: "Jan Novak", telefon: "+420 721 123 456", email: "novak@email.cz", nemovitostId: "nem1", datumNastupu: "2020-06-01", datumOdchodu: "", najem: 22000, kauce: 44000, poznamka: "Spolehlivy najemnik", meridla: [
+            { id: "m1", typ: "Voda studena", stav: "1250.3", datum: "2020-06-01", poznamka: "nastup" },
+            { id: "m2", typ: "Tepla voda (TUV)", stav: "320.1", datum: "2020-06-01", poznamka: "nastup" },
+            { id: "m3", typ: "Teplo", stav: "45.2", datum: "2020-06-01", poznamka: "nastup" },
+            { id: "m4", typ: "Plyn", stav: "890.0", datum: "2020-06-01", poznamka: "nastup" },
+        ]},
+        { id: "najN2", jmeno: "Petra Svobodova", telefon: "+420 606 234 567", email: "petra@email.cz", nemovitostId: "nem2", datumNastupu: "2022-02-01", datumOdchodu: "2025-01-31", najem: 16500, kauce: 28000, poznamka: "Smlouva vyprsela", meridla: [
+            { id: "m5", typ: "Voda studena", stav: "540.0", datum: "2022-02-01", poznamka: "nastup" },
+            { id: "m6", typ: "Voda studena", stav: "1890.7", datum: "2025-01-31", poznamka: "odchod" },
+        ]},
+        { id: "najN3", jmeno: "Tomas Kral", telefon: "+420 777 456 789", email: "kral@email.cz", nemovitostId: "nem4", datumNastupu: "2021-01-01", datumOdchodu: "", najem: 19500, kauce: 35000, poznamka: "Dlouhodoby najemnik, plati pravidelne", meridla: [
+            { id: "m7", typ: "Plyn", stav: "234.5", datum: "2021-01-01", poznamka: "nastup" },
+            { id: "m8", typ: "Teplo", stav: "12.0", datum: "2021-01-01", poznamka: "nastup" },
+        ]},
+    ],
     nemovitosti: {
         properties: [
-            { id: "nem1", name: "Byt 2+1 Vinohrady", address: "Mnesova 12, Praha 2", type: "2+1", area: 68, purchasePrice: 4200000, currentPrice: 5800000, purchaseDate: "2019-03-15", status: "pronajato", income: { rent: 22000, other: 0 }, expenses: { utilities: 2200, insurance: 800, maintenance: 600, tax: 1200, management: 0 }, zaloh: { elektrina: 1200, plyn: 800, voda: 400, teplo: 600, svj: 1800, internet: 0, plati: "najemnik" }, fondOprav: { mesicne: 1500, zustatek: 42000 }, mortgage: { monthly: 18500, remaining: 2850000, rate: 2.89, endDate: "2049-03-15", fixationEnd: "2026-08-15", bank: "Komercni banka" }, tenant: { name: "Jan Novak", phone: "+420 721 123 456", email: "novak@email.cz", since: "2020-06-01", contractEnd: "2026-05-31", deposit: 44000, depositStatus: "skladena", depositAccount: "sporici", noticePeriod: "2" }, notes: "Nova kuchyn 2022. Spolehlivy najemnik.", documents: [] },
-            { id: "nem2", name: "Byt 1+kk Zizkov", address: "Seifertova 45, Praha 3", type: "1+kk", area: 32, purchasePrice: 2800000, currentPrice: 3650000, purchaseDate: "2021-11-08", status: "pronajato", income: { rent: 16500, other: 500 }, expenses: { utilities: 1400, insurance: 500, maintenance: 300, tax: 700, management: 1650 }, zaloh: { elektrina: 600, plyn: 0, voda: 300, teplo: 500, svj: 1100, internet: 0, plati: "najemnik" }, fondOprav: { mesicne: 800, zustatek: 18500 }, mortgage: { monthly: 14200, remaining: 2350000, rate: 3.49, endDate: "2051-11-08", fixationEnd: "2025-11-08", bank: "CSOB" }, tenant: { name: "Petra Svobodova", phone: "+420 606 234 567", email: "petra@email.cz", since: "2022-02-01", contractEnd: "2025-01-31", deposit: 28000, depositStatus: "skladena", depositAccount: "bezny", noticePeriod: "2" }, notes: "Sprava pres agenturu. Fixace hypoteky 11/2025!", documents: [] },
-            { id: "nem3", name: "Byt 3+1 Dejvice", address: "Cermakova 8, Praha 6", type: "3+1", area: 92, purchasePrice: 7500000, currentPrice: 9200000, purchaseDate: "2017-06-20", status: "volny", income: { rent: 0, other: 0 }, expenses: { utilities: 3200, insurance: 1200, maintenance: 1500, tax: 1800, management: 0 }, zaloh: { elektrina: 0, plyn: 0, voda: 0, teplo: 0, svj: 2400, internet: 0, plati: "pronajimatel" }, fondOprav: { mesicne: 2500, zustatek: 85000 }, mortgage: { monthly: 28000, remaining: 3100000, rate: 1.99, endDate: "2047-06-20", fixationEnd: "2027-06-20", bank: "Hypotecni banka" }, tenant: { name: "Volny", phone: "", email: "", since: "", contractEnd: "", deposit: 0, depositStatus: "vracena", depositAccount: "bezny", noticePeriod: "2" }, notes: "Momentalne volny. Rekonstrukce koupelny Q1 2026.", documents: [] },
-            { id: "nem4", name: "Byt 2+kk Holesovice", address: "Delnicka 22, Praha 7", type: "2+kk", area: 55, purchasePrice: 3600000, currentPrice: 4900000, purchaseDate: "2020-09-01", status: "pronajato", income: { rent: 19500, other: 0 }, expenses: { utilities: 1800, insurance: 650, maintenance: 400, tax: 900, management: 0 }, zaloh: { elektrina: 900, plyn: 500, voda: 350, teplo: 700, svj: 1400, internet: 550, plati: "najemnik" }, fondOprav: { mesicne: 1200, zustatek: 31000 }, mortgage: { monthly: 16800, remaining: 2900000, rate: 2.59, endDate: "2050-09-01", fixationEnd: "2026-09-01", bank: "Raiffeisenbank" }, tenant: { name: "Tomas Kral", phone: "+420 777 456 789", email: "kral@email.cz", since: "2021-01-01", contractEnd: "2026-12-31", deposit: 35000, depositStatus: "skladena", depositAccount: "sporici", noticePeriod: "2" }, notes: "Dlouhodoby najemnik, plati pravidelne.", documents: [] },
+            { id: "nem1", name: "Byt 2+1 Vinohrady", address: "Mnesova 12, Praha 2", type: "2+1", area: 68, purchasePrice: 4200000, currentPrice: 5800000, purchaseDate: "2019-03-15", status: "pronajato", income: { rent: 22000, other: 0 }, expenses: { utilities: 2200, insurance: 800, maintenance: 600, tax: 1200, management: 0 }, zaloh: { elektrina: 1200, plyn: 800, voda: 400, teplo: 600, svj: 1800, internet: 0, plati: "najemnik" }, fondOprav: { mesicne: 1500, zustatek: 42000 }, mortgage: { monthly: 18500, remaining: 2850000, rate: 2.89, endDate: "2049-03-15", fixationEnd: "2026-08-15", bank: "Komercni banka" }, tenant: { name: "Jan Novak", phone: "+420 721 123 456", email: "novak@email.cz", since: "2020-06-01", contractEnd: "2026-05-31", deposit: 44000, depositStatus: "skladena", depositAccount: "sporici", noticePeriod: "2" }, notes: "Nova kuchyn 2022. Spolehlivy najemnik.", documents: [], najemnici: [] },
+            { id: "nem2", name: "Byt 1+kk Zizkov", address: "Seifertova 45, Praha 3", type: "1+kk", area: 32, purchasePrice: 2800000, currentPrice: 3650000, purchaseDate: "2021-11-08", status: "pronajato", income: { rent: 16500, other: 500 }, expenses: { utilities: 1400, insurance: 500, maintenance: 300, tax: 700, management: 1650 }, zaloh: { elektrina: 600, plyn: 0, voda: 300, teplo: 500, svj: 1100, internet: 0, plati: "najemnik" }, fondOprav: { mesicne: 800, zustatek: 18500 }, mortgage: { monthly: 14200, remaining: 2350000, rate: 3.49, endDate: "2051-11-08", fixationEnd: "2025-11-08", bank: "CSOB" }, tenant: { name: "Petra Svobodova", phone: "+420 606 234 567", email: "petra@email.cz", since: "2022-02-01", contractEnd: "2025-01-31", deposit: 28000, depositStatus: "skladena", depositAccount: "bezny", noticePeriod: "2" }, notes: "Sprava pres agenturu. Fixace hypoteky 11/2025!", documents: [], najemnici: [] },
+            { id: "nem3", name: "Byt 3+1 Dejvice", address: "Cermakova 8, Praha 6", type: "3+1", area: 92, purchasePrice: 7500000, currentPrice: 9200000, purchaseDate: "2017-06-20", status: "volny", income: { rent: 0, other: 0 }, expenses: { utilities: 3200, insurance: 1200, maintenance: 1500, tax: 1800, management: 0 }, zaloh: { elektrina: 0, plyn: 0, voda: 0, teplo: 0, svj: 2400, internet: 0, plati: "pronajimatel" }, fondOprav: { mesicne: 2500, zustatek: 85000 }, mortgage: { monthly: 28000, remaining: 3100000, rate: 1.99, endDate: "2047-06-20", fixationEnd: "2027-06-20", bank: "Hypotecni banka" }, tenant: { name: "Volny", phone: "", email: "", since: "", contractEnd: "", deposit: 0, depositStatus: "vracena", depositAccount: "bezny", noticePeriod: "2" }, notes: "Momentalne volny. Rekonstrukce koupelny Q1 2026.", documents: [], najemnici: [] },
+            { id: "nem4", name: "Byt 2+kk Holesovice", address: "Delnicka 22, Praha 7", type: "2+kk", area: 55, purchasePrice: 3600000, currentPrice: 4900000, purchaseDate: "2020-09-01", status: "pronajato", income: { rent: 19500, other: 0 }, expenses: { utilities: 1800, insurance: 650, maintenance: 400, tax: 900, management: 0 }, zaloh: { elektrina: 900, plyn: 500, voda: 350, teplo: 700, svj: 1400, internet: 550, plati: "najemnik" }, fondOprav: { mesicne: 1200, zustatek: 31000 }, mortgage: { monthly: 16800, remaining: 2900000, rate: 2.59, endDate: "2050-09-01", fixationEnd: "2026-09-01", bank: "Raiffeisenbank" }, tenant: { name: "Tomas Kral", phone: "+420 777 456 789", email: "kral@email.cz", since: "2021-01-01", contractEnd: "2026-12-31", deposit: 35000, depositStatus: "skladena", depositAccount: "sporici", noticePeriod: "2" }, notes: "Dlouhodoby najemnik, plati pravidelne.", documents: [], najemnici: [] },
         ],
     },
 };
+
 // ============================================================
 // STORAGE
 // ============================================================
@@ -126,7 +180,7 @@ const loadData = () => {
         if (raw) {
             const saved = JSON.parse(raw);
             const migratedFaktury = migrateFaktury(saved.faktury);
-            return Object.assign(Object.assign(Object.assign({}, initialState), saved), { firma: saved.firma || initialState.firma, zakaznici: (saved.zakaznici && saved.zakaznici.length) ? saved.zakaznici : initialState.zakaznici, faktury: migratedFaktury.length ? migratedFaktury : initialState.faktury, danNaklady: saved.danNaklady || {}, nemovitosti: {
+            return Object.assign(Object.assign(Object.assign({}, initialState), saved), { firma: saved.firma || initialState.firma, zakaznici: saved.zakaznici || [], faktury: migratedFaktury || [], danNaklady: saved.danNaklady || {}, prijateFaktury: saved.prijateFaktury || [], dodavatele: saved.dodavatele || [], metodaVydaju: saved.metodaVydaju || "pausal", najemnici: saved.najemnici || [], nemovitosti: {
                     properties: (saved.nemovitosti && saved.nemovitosti.properties && saved.nemovitosti.properties.length)
                         ? saved.nemovitosti.properties
                         : initialState.nemovitosti.properties,
@@ -256,6 +310,164 @@ const calcRocniPrijmy = (faktury, nemovitosti, rok) => {
 // ============================================================
 // PRINT / INVOICE HTML
 // ============================================================
+// ============================================================
+// QR KÓD GENERÁTOR — čistý JS, žádné závislosti, inline SVG
+// ============================================================
+const QRCode = (() => {
+  const EXP = new Uint8Array(512), LOG = new Uint8Array(256);
+  let _x = 1;
+  for (let i = 0; i < 255; i++) { EXP[i]=_x; LOG[_x]=i; _x=_x<128?_x*2:(_x*2)^285; }
+  for (let i = 255; i < 512; i++) EXP[i]=EXP[i-255];
+  const mul = (a,b) => a===0||b===0?0:EXP[LOG[a]+LOG[b]];
+
+  // Generator polynomials for ECC levels
+  const GEN = {
+    7: [0,87,229,146,149,238,102,21],
+    10:[0,251,67,46,61,118,70,64,94,32,45],
+    13:[0,74,152,176,100,86,100,106,104,130,218,206,140,78],
+    15:[0,8,183,61,91,202,37,51,58,58,237,140,124,5,99,105],
+    16:[0,59,13,104,189,68,209,30,8,163,65,41,229,98,50,36,59],
+    18:[0,239,251,183,113,149,175,199,215,240,220,73,82,173,75,32,67,217,146],
+    20:[0,152,185,240,5,111,99,6,220,112,150,69,36,187,22,228,198,121,121,165,174],
+    22:[0,89,179,131,176,182,244,19,189,69,40,28,137,29,123,67,253,86,218,230,26,145,245],
+    24:[0,122,118,169,70,178,237,216,102,115,150,229,73,130,72,61,43,206,1,237,247,127,217,144,117],
+    26:[0,173,125,158,2,103,182,118,17,145,201,111,28,165,53,161,21,245,142,13,102,48,227,153,145,218,70],
+    28:[0,252,9,28,13,18,251,208,150,103,174,100,41,167,12,247,56,117,119,233,127,181,100,121,147,176,74,58,197],
+    30:[0,212,246,77,73,195,192,75,98,5,70,103,177,22,217,138,51,181,246,72,25,18,46,228,74,216,195,11,106,130,150],
+  };
+
+  function rsEncode(data, nsym) {
+    const gen = GEN[nsym]; if (!gen) return new Uint8Array(nsym);
+    const msg = new Uint8Array(data.length + nsym); msg.set(data);
+    for (let i=0;i<data.length;i++) { const c=msg[i]; if(c!==0) for(let j=1;j<gen.length;j++) msg[i+j]^=mul(c,gen[j]); }
+    return msg.slice(data.length);
+  }
+
+  // Version table [ver, moduleSize, dataCW, ecCW, blocks] — ECC Level M
+  const CAPS = [
+    [1,21,16,10,1],[2,25,28,16,1],[3,29,44,26,2],[4,33,64,18,2],
+    [5,37,86,24,2],[6,41,108,16,4],[7,45,124,18,4],
+  ];
+
+  function encode(text) {
+    const bytes = (new TextEncoder()).encode(text);
+    const n = bytes.length;
+    let cap; for(const c of CAPS){if(c[2]>=n+3){cap=c;break;}}
+    if(!cap) return null;
+    const [ver,size,dataCW,ecCW,blocks] = cap;
+    const cwPerBlock = Math.floor(dataCW/blocks);
+    const extra = dataCW - cwPerBlock*blocks;
+
+    const bits=[];
+    const push=(v,len)=>{for(let i=len-1;i>=0;i--)bits.push((v>>i)&1);};
+    push(4,4); push(n,8);
+    for(const b of bytes) push(b,8);
+    for(let i=0;i<4&&bits.length<dataCW*8;i++) bits.push(0);
+    while(bits.length%8) bits.push(0);
+    const PAD=[0xEC,0x11]; let pi=0;
+    while(bits.length<dataCW*8) push(PAD[pi++%2],8);
+
+    const data=new Uint8Array(dataCW);
+    for(let i=0;i<dataCW;i++) for(let j=0;j<8;j++) data[i]=(data[i]<<1)|(bits[i*8+j]||0);
+
+    // Split into blocks and RS encode
+    const dataBlocks=[], ecBlocks=[];
+    let off=0;
+    for(let b=0;b<blocks;b++){
+      const bLen = b<blocks-extra ? cwPerBlock : cwPerBlock+1;
+      const block = data.slice(off, off+bLen); off+=bLen;
+      dataBlocks.push(block);
+      ecBlocks.push(rsEncode(block, ecCW));
+    }
+
+    // Interleave data
+    const allCW=[];
+    for(let i=0;i<cwPerBlock;i++) for(let b=0;b<blocks;b++) allCW.push(dataBlocks[b][i]);
+    if(extra>0) for(let b=blocks-extra;b<blocks;b++) allCW.push(dataBlocks[b][cwPerBlock]);
+    for(let i=0;i<ecCW;i++) for(let b=0;b<blocks;b++) allCW.push(ecBlocks[b][i]);
+
+    const cwBits=[];
+    for(const cw of allCW) for(let i=7;i>=0;i--) cwBits.push((cw>>i)&1);
+
+    const mat=Array.from({length:size},()=>new Array(size).fill(-1));
+    const func=Array.from({length:size},()=>new Array(size).fill(false));
+    const setF=(r,c,v)=>{if(r>=0&&r<size&&c>=0&&c<size){mat[r][c]=v;func[r][c]=true;}};
+
+    // Finder patterns
+    const finder=(r,c)=>{
+      for(let i=-1;i<=7;i++) for(let j=-1;j<=7;j++){
+        const v=i<0||i>6||j<0||j>6?0:(i===0||i===6||j===0||j===6||(i>=2&&i<=4&&j>=2&&j<=4))?1:0;
+        setF(r+i,c+j,v);
+      }
+    };
+    finder(0,0); finder(0,size-7); finder(size-7,0);
+
+    // Timing strips
+    for(let i=8;i<size-8;i++){setF(6,i,i%2===0?1:0);setF(i,6,i%2===0?1:0);}
+    // Dark module
+    setF(4*ver+9,8,1);
+
+    // Alignment patterns (ver>=2)
+    if(ver>=2){
+      const APOS={2:[6,18],3:[6,22],4:[6,26],5:[6,30],6:[6,34],7:[6,22,38]};
+      const pos=APOS[ver]||[];
+      for(const ar of pos) for(const ac of pos){
+        if(func[ar][ac]) continue;
+        for(let i=-2;i<=2;i++) for(let j=-2;j<=2;j++){
+          setF(ar+i,ac+j,(i===-2||i===2||j===-2||j===2||i===0&&j===0)?1:0);
+        }
+      }
+    }
+
+    // Format info — ECC M, mask pattern 2: (r+c)%3===0
+    // Precomputed bits for M+mask2: 110011000101111
+    const FMT=[1,1,0,0,1,1,0,0,0,1,0,1,1,1,1];
+    for(let i=0;i<15;i++){
+      const v=FMT[i];
+      if(i<6){setF(8,i,v);setF(i,8,v);}
+      else if(i===6){setF(8,7,v);setF(7,8,v);}
+      else if(i===7){setF(8,8,v);setF(8,size-8,v);}
+      else{setF(8,size-15+i,v);setF(size-15+i,8,v);}
+    }
+
+    // Place data bits
+    let bi=0,up=true;
+    for(let c=size-1;c>=1;c-=2){
+      if(c===6) c=5;
+      for(let ri=0;ri<size;ri++){
+        const r=up?size-1-ri:ri;
+        for(let dc=0;dc<=1;dc++){
+          const col=c-dc;
+          if(!func[r][col]){
+            let b=bi<cwBits.length?cwBits[bi++]:0;
+            if((r+col)%3===0) b^=1; // mask 2
+            mat[r][col]=b;
+          }
+        }
+      }
+      up=!up;
+    }
+    return {mat,size};
+  }
+
+  function toSVG(text) {
+    try {
+      const qr = encode(text);
+      if(!qr) return '';
+      const {mat,size} = qr;
+      const Q=4, px=4, total=(size+Q*2)*px;
+      let r='<rect width="'+total+'" height="'+total+'" fill="#fff"/>';
+      for(let row=0;row<size;row++)
+        for(let col=0;col<size;col++)
+          if(mat[row][col]===1)
+            r+='<rect x="'+(col+Q)*px+'" y="'+(row+Q)*px+'" width="'+px+'" height="'+px+'" fill="#000"/>';
+      return '<svg xmlns="http://www.w3.org/2000/svg" width="'+total+'" height="'+total+'" viewBox="0 0 '+total+' '+total+'">'+r+'</svg>';
+    } catch(e) { return ''; }
+  }
+
+  return {toSVG};
+})();
+
 const generateInvoiceHTML = (faktura, firma, zakaznik) => {
     var _a;
     if (!faktura || !firma)
@@ -333,6 +545,17 @@ const generateInvoiceHTML = (faktura, firma, zakaznik) => {
   <p>Variabilní symbol: ${faktura.variabilniSymbol || ((_a = faktura.cislo) === null || _a === void 0 ? void 0 : _a.replace(/\D/g, ""))}</p>
   ${faktura.poznamka ? `<p>Poznámka: ${faktura.poznamka}</p>` : ""}
 </div>
+${(firma.banka && (faktura.zpusobPlatby || "Převodem") === "Převodem") ? (() => {
+  const vs = faktura.variabilniSymbol || (faktura.cislo || "").replace(/\D/g,"");
+  const ucet = firma.banka.replace("/","_");
+  const spayd = `SPD*1.0*ACC:${ucet}*AM:${(total.celkem).toFixed(2)}*CC:CZK*VS:${vs}*MSG:${faktura.cislo}`;
+  const qrSvg = QRCode.toSVG(spayd);
+  return qrSvg ? `<div style="float:right;margin:-10px 0 10px 20px;text-align:center">
+    ${qrSvg}
+    <div style="font-size:10px;color:#555;margin-top:4px;font-family:Arial">QR Platba</div>
+    <div style="font-size:9px;color:#888;font-family:Arial">${firma.banka}</div>
+  </div>` : '';
+})() : ""}
 <div class="stamp">UHRAZENO</div>
 <scr"+"ipt>window.onload=()=>window.print()</scr"+"ipt>
 </body></html>`;
@@ -370,52 +593,73 @@ function ConfirmDialog({ message, onYes, onNo }) {
 }
 // PrintModal — zobrazí dokument přes celou obrazovku
 // Uživatel tiskne přímo přes prohlížeč: Ctrl+P (PC) nebo Sdílet→Tisknout (mobil)
+// PrintModal — zobrazí dokument přes celou obrazovku
+// PC: otevře nové okno → auto-tisk (Ctrl+P)
+// Mobil: Sdílet → WhatsApp/email/tisk v prohlížeči
 function PrintModal({ html, title, onClose }) {
     if (!html) return null;
     const isMob = /iPhone|iPad|Android/i.test(navigator.userAgent);
     const canShare = isMob && !!navigator.share;
 
+    // Otevřít v novém okně — funguje na PC i Android Chrome
+    const openWindow = () => {
+        const w = window.open("", "_blank");
+        if (!w) { alert("Povolte pop-up okna v prohlížeči pro tisk."); return; }
+        w.document.open();
+        w.document.write(html);
+        w.document.close();
+    };
+
+    // Sdílet přes Web Share API (mobil) → WhatsApp, email, AirDrop, tisk...
     const doShare = async () => {
         try {
-            // Vytvoř soubor pro sdílení
             const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-            const file = new File([blob], title.replace(/[^a-z0-9]/gi,"_") + ".html", { type: "text/html" });
+            const file = new File([blob], title.replace(/[^a-z0-9]/gi, "_") + ".html", { type: "text/html" });
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
                 await navigator.share({ files: [file], title: title });
             } else {
                 // Fallback: stáhnout soubor
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement("a");
-                a.href = url; a.download = title.replace(/[^a-z0-9]/gi,"_") + ".html";
+                a.href = url;
+                a.download = title.replace(/[^a-z0-9]/gi, "_") + ".html";
                 document.body.appendChild(a); a.click(); document.body.removeChild(a);
                 setTimeout(() => URL.revokeObjectURL(url), 5000);
             }
-        } catch(e) { console.log("Share cancelled or failed:", e); }
+        } catch(e) { console.log("Share cancelled:", e); }
     };
 
     return React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 4000, display: "flex", flexDirection: "column", background: "#1a3a5c" } },
         // Toolbar
         React.createElement("div", { style: { background: "#1a3a5c", padding: "10px 16px", flexShrink: 0,
-                display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px",
-                flexWrap: "wrap" } },
+                display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px", flexWrap: "wrap" } },
             React.createElement("span", { style: { color: "#fff", fontWeight: "700", fontSize: "14px" } }, "\uD83D\uDCC4 " + title),
-            React.createElement("div", { style: { display: "flex", gap: "8px", alignItems: "center" } },
-                isMob
-                    ? React.createElement("button", {
-                        onClick: doShare,
-                        style: { padding: "10px 18px", background: "#16a34a", color: "#fff", border: "none",
-                            borderRadius: "8px", fontWeight: "700", fontSize: "14px", cursor: "pointer" }
-                      }, "\uD83D\uDCF1 Sdílet / Tisknout")
-                    : React.createElement("div", { style: { background: "#fffbeb", border: "1px solid #fcd34d",
-                            borderRadius: "8px", padding: "7px 14px", fontSize: "12px", color: "#92400e", fontWeight: "600" } },
-                        "\uD83D\uDDA5\uFE0F Ctrl+P nebo pravé tlačítko \u2192 Tisk"),
+            React.createElement("div", { style: { display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" } },
+                // PC: tlačítko otevřít nové okno
+                !isMob && React.createElement("button", { onClick: openWindow,
+                    style: { padding: "10px 18px", background: "#16a34a", color: "#fff", border: "none",
+                        borderRadius: "8px", fontWeight: "700", fontSize: "14px", cursor: "pointer" } },
+                    "\uD83D\uDDA8\uFE0F Tisknout"),
+                // PC: nápověda
+                !isMob && React.createElement("div", { style: { background: "#fffbeb", border: "1px solid #fcd34d",
+                        borderRadius: "8px", padding: "7px 14px", fontSize: "12px", color: "#92400e", fontWeight: "600" } },
+                    "\uD83D\uDDA5\uFE0F Ctrl+P v nov\u00E9m okn\u011B"),
+                // Mobil: Sdílet (WhatsApp, email, tisk...)
+                isMob && React.createElement("button", { onClick: doShare,
+                    style: { padding: "10px 18px", background: "#16a34a", color: "#fff", border: "none",
+                        borderRadius: "8px", fontWeight: "700", fontSize: "14px", cursor: "pointer" } },
+                    "\uD83D\uDCF1 Sd\u00EDlet / WhatsApp / Tisk"),
+                // Mobil: otevřít okno jako záloha
+                isMob && React.createElement("button", { onClick: openWindow,
+                    style: { padding: "10px 14px", background: "#2563eb", color: "#fff", border: "none",
+                        borderRadius: "8px", fontWeight: "600", fontSize: "13px", cursor: "pointer" } },
+                    "\uD83D\uDD17 Otev\u0159\u00EDt"),
+                // Zavřít
                 React.createElement("button", { onClick: onClose,
                     style: { padding: "10px 14px", background: "rgba(255,255,255,0.15)", color: "#fff",
                         border: "1px solid rgba(255,255,255,0.3)", borderRadius: "8px",
-                        fontSize: "13px", cursor: "pointer", fontWeight: "600" } }, "\u2715 Zav\u0159\u00EDt")
-            )
-        ),
-        // Dokument
+                        fontSize: "13px", cursor: "pointer", fontWeight: "600" } }, "\u2715 Zav\u0159\u00EDt"))),
+        // Náhled dokumentu
         React.createElement("div", { style: { flex: 1, overflow: "auto", background: "#fff" },
             dangerouslySetInnerHTML: { __html: html } })
     );
@@ -482,6 +726,38 @@ const stavBadge = (stav) => {
 // 4. Authorized JS origins: přidej URL kde app běží
 // 5. Zkopíruj Client ID sem:
 const GDRIVE_CLIENT_ID = "1032917712894-ccd3c0ttmm313dvbrg1fbih7jifob6ej.apps.googleusercontent.com";
+
+// ── Gemini AI ────────────────────────────────────────────────
+const GEMINI_API_KEY = "AIzaSyDHkVvQxbW5bVDVyLGLpDL2XcTOZ88NVLo";
+const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=" + GEMINI_API_KEY;
+
+async function callGemini(prompt, imageBase64, mimeType) {
+    const parts = [{ text: prompt }];
+    if (imageBase64) {
+        parts.push({ inline_data: { mime_type: mimeType || "image/jpeg", data: imageBase64 } });
+    }
+    const resp = await fetch(GEMINI_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts }] })
+    });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error.message);
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    // Extrahuj JSON z odpovědi
+    const match = text.match(/```json\n?([\s\S]*?)```/) || text.match(/(\{[\s\S]*\})/);
+    if (match) return JSON.parse(match[1]);
+    return JSON.parse(text);
+}
+
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(",")[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
 const GDRIVE_FILE_NAME = "fakturace_cz_data.json";
 const GDRIVE_SCOPES = "https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file";
 let gapiLoaded = false;
@@ -594,6 +870,52 @@ async function createWeeklyBackupIfNeeded(dataObj) {
     }
 }
 // Kompaktní Drive tlačítko pro mobilní horní lištu
+// ── AI Scan tlačítko ─────────────────────────────────────────
+// Univerzální komponenta — přijme soubor (foto/PDF) a zpracuje přes Gemini
+function AIScanBtn({ label, prompt, onResult, notify }) {
+    const [loading, setLoading] = (0, useState)(false);
+    const inputRef = (0, React.useRef)();
+
+    const handleFile = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        setLoading(true);
+        notify("\uD83E\uDD16 Zpracovávám AI...");
+        try {
+            const base64 = await fileToBase64(file);
+            const mimeType = file.type || "image/jpeg";
+            const result = await callGemini(prompt, base64, mimeType);
+            onResult(result);
+            notify("\u2705 AI data načtena!");
+        } catch(e) {
+            console.error(e);
+            notify("\u274C Chyba AI: " + e.message);
+        }
+        setLoading(false);
+        e.target.value = "";
+    };
+
+    return React.createElement("label", { style: { display: "inline-block" } },
+        React.createElement("span", {
+            style: {
+                display: "inline-flex", alignItems: "center", gap: "6px",
+                padding: "8px 14px", background: loading ? "#6b7280" : "#7c3aed",
+                color: "#fff", borderRadius: "6px", fontSize: "13px",
+                cursor: loading ? "not-allowed" : "pointer", fontWeight: "500",
+                opacity: loading ? 0.7 : 1
+            }
+        }, loading ? "\u23F3 Zpracovávám..." : label),
+        React.createElement("input", {
+            ref: inputRef,
+            type: "file",
+            accept: "image/*,.pdf",
+            style: { display: "none" },
+            disabled: loading,
+            onChange: handleFile
+        })
+    );
+}
+
 function MobileDriveBtn({ data, updateData, notify }) {
     const [status, setStatus] = (0, useState)("idle");
     const hasClientId = GDRIVE_CLIENT_ID !== "VLOZ_SEM_TVUJ_GOOGLE_CLIENT_ID" && GDRIVE_CLIENT_ID.length > 10;
@@ -807,8 +1129,10 @@ function App() {
         { id: "zakaznici", label: "👥 Zákazníci" },
         { id: "dph", label: "📋 DPH" },
         { id: "dan", label: "💰 Daň z příjmu" },
+        { id: "prijate", label: "📥 Přijaté faktury" },
+        { id: "nemovitosti", label: "🏘️ Nemovitosti" },
+        { id: "najemnici", label: "🏠 Nájemníci" },
         { id: "majetek", label: "🏭 Majetek" },
-        { id: "nemovitosti", label: "🏠 Nemovitosti" },
         { id: "nastaveni", label: "⚙️ Nastavení" },
     ];
     // Detect mobile: screen width < 768px
@@ -826,7 +1150,9 @@ function App() {
         { id: "dph", icon: "📋", label: "DPH" },
         { id: "dan", icon: "💰", label: "Daň" },
         { id: "majetek", icon: "🏭", label: "Majetek" },
-        { id: "nemovitosti", icon: "🏠", label: "Reality" },
+        { id: "prijate", icon: "📥", label: "P.Fakt." },
+        { id: "nemovitosti", icon: "🏘️", label: "Reality" },
+        { id: "najemnici", icon: "🏠", label: "Nájemn." },
         { id: "nastaveni", icon: "⚙️", label: "Nast." },
     ];
     const renderContent = () => (React.createElement(React.Fragment, null,
@@ -835,6 +1161,8 @@ function App() {
         activeTab === "zakaznici" && React.createElement(Zakaznici, { data: data, updateData: updateData, notify: notify }),
         activeTab === "dph" && React.createElement(DPHSection, { data: data }),
         activeTab === "dan" && React.createElement(DanZPrijmu, { data: data, updateData: updateData, notify: notify }),
+        activeTab === "prijate" && React.createElement(PrijateFaktury, { data: data, updateData: updateData, notify: notify }),
+        activeTab === "najemnici" && React.createElement(NajemniciGlobal, { data: data, updateData: updateData, notify: notify, setActiveTab: setActiveTab }),
         activeTab === "majetek" && React.createElement(Majetek, { data: data, updateData: updateData, notify: notify }),
         activeTab === "nemovitosti" && React.createElement(Nemovitosti, { data: data, updateData: updateData, notify: notify }),
         activeTab === "nastaveni" && React.createElement(Nastaveni, { data: data, updateData: updateData, notify: notify })));
@@ -992,8 +1320,10 @@ function Fakturace({ data, updateData, notify, setModal }) {
     const [confirmDel, setConfirmDel] = (0, useState)(null);
     const [printHtml, setPrintHtml] = (0, useState)(null);
     const [printTitle, setPrintTitle] = (0, useState)("");
+    const [rok, setRok] = (0, useState)(new Date().getFullYear());
     const faktury = data.faktury.filter(f => {
         var _a, _b;
+        if (new Date(f.datumVystaveni).getFullYear() !== rok) return false;
         if (filterStav !== "vse" && f.stav !== filterStav)
             return false;
         if (search && !((_a = f.cislo) === null || _a === void 0 ? void 0 : _a.toLowerCase().includes(search.toLowerCase())) &&
@@ -1050,6 +1380,15 @@ function Fakturace({ data, updateData, notify, setModal }) {
         notify("Stav faktury upraven.");
     };
     return (React.createElement("div", null,
+        React.createElement("div", { style: { display: "flex", gap: "6px", marginBottom: "8px", flexWrap: "wrap" } },
+            Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(y =>
+                React.createElement("button", { key: y, onClick: () => setRok(y), style: {
+                    padding: "6px 14px", border: "1px solid", borderRadius: "20px", fontSize: "13px",
+                    fontWeight: "600", cursor: "pointer",
+                    borderColor: rok === y ? "#1a3a5c" : "#d1d5db",
+                    background: rok === y ? "#1a3a5c" : "#fff",
+                    color: rok === y ? "#fff" : "#374151"
+                }}, y))),
         React.createElement("div", { style: { display: "flex", gap: "12px", marginBottom: "20px", flexWrap: "wrap", alignItems: "center" } },
             React.createElement(Btn, { onClick: noveFaktura }, "+ Nov\u00E1 faktura"),
             React.createElement("input", { value: search, onChange: e => setSearch(e.target.value), placeholder: "\uD83D\uDD0D Hledat...", style: { padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px", width: "200px" } }),
@@ -1214,6 +1553,7 @@ function Zakaznici({ data, updateData, notify }) {
     const [showForm, setShowForm] = (0, useState)(false);
     const [editZ, setEditZ] = (0, useState)(null);
     const [confirmDelZ, setConfirmDelZ] = (0, useState)(null);
+    const [filterAktivni, setFilterAktivni] = (0, useState)("aktivni");
     const save = (z) => {
         updateData(prev => {
             const existing = prev.zakaznici.findIndex(x => x.id === z.id);
@@ -1235,13 +1575,39 @@ function Zakaznici({ data, updateData, notify }) {
     };
     return (React.createElement("div", null,
         React.createElement("div", { style: { marginBottom: "16px" } },
-            React.createElement(Btn, { onClick: novy }, "+ Nov\u00FD z\u00E1kazn\u00EDk")),
-        React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: "16px" } }, data.zakaznici.map(z => {
+            React.createElement(Btn, { onClick: novy }, "+ Nov\u00FD z\u00E1kazn\u00EDk"),
+                    React.createElement(AIScanBtn, {
+                        label: "\uD83E\uDD16 Na\u010D\u00EDst z vizitky / dokumentu",
+                        prompt: "Z tohoto obrázku vizitky nebo dokumentu extrahuj kontaktní údaje firmy nebo osoby. Vrať POUZE JSON objekt ve formátu: {\"nazev\": \"\", \"ico\": \"\", \"dic\": \"\", \"ulice\": \"\", \"mesto\": \"\", \"psc\": \"\", \"email\": \"\", \"telefon\": \"\"}. Pokud údaj není nalezen, nech pole prázdné.",
+                        onResult: (result) => {
+                            setEditZ(Object.assign({ id: generateId(), poznamka: "" }, result));
+                            setShowForm(true);
+                        },
+                        notify: notify
+                    })),
+        React.createElement("div", { style: { display: "flex", gap: "8px", marginBottom: "16px", flexWrap: "wrap" } },
+            ["aktivni","neaktivni","vse"].map(k => React.createElement("button", {
+                key: k,
+                onClick: () => setFilterAktivni(k),
+                style: { padding: "6px 14px", borderRadius: "6px", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: "600",
+                    background: filterAktivni === k ? "#1a3a5c" : "#e5e7eb",
+                    color: filterAktivni === k ? "#fff" : "#374151" }
+            }, k === "aktivni" ? "✅ Aktivní" : k === "neaktivni" ? "⛔ Neaktivní" : "Všichni"))),
+        React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: "16px" } }, data.zakaznici.filter(z => {
+            if (filterAktivni === "aktivni") return z.aktivni !== false;
+            if (filterAktivni === "neaktivni") return z.aktivni === false;
+            return true;
+        }).map(z => {
             const faktury = data.faktury.filter(f => f.zakaznikId === z.id && f.stav !== "storno");
             const obrat = faktury.reduce((s, f) => s + calcFakturaTotal(f.polozky || []).celkem, 0);
             return (React.createElement(Card, { key: z.id },
                 React.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: "8px" } },
-                    React.createElement("h3", { style: { margin: 0, fontSize: "15px", color: "#1a3a5c" } }, z.nazev),
+                    React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "6px" } },
+                        React.createElement("h3", { style: { margin: 0, fontSize: "15px", color: "#1a3a5c" } }, z.nazev),
+                        React.createElement("span", { style: { fontSize: "10px", padding: "2px 6px", borderRadius: "10px", fontWeight: "700",
+                            background: z.aktivni !== false ? "#dcfce7" : "#fee2e2",
+                            color: z.aktivni !== false ? "#15803d" : "#dc2626" } },
+                            z.aktivni !== false ? "aktivní" : "neaktivní")),
                     React.createElement("div", { style: { display: "flex", gap: "4px" } },
                         React.createElement(Btn, { onClick: () => { setEditZ(z); setShowForm(true); }, variant: "secondary", small: true }, "\u270F\uFE0F"),
                         React.createElement(Btn, { onClick: () => del(z.id), variant: "danger", small: true }, "\uD83D\uDDD1"))),
@@ -1293,13 +1659,253 @@ function ZakaznikForm({ z, onSave, onClose }) {
         React.createElement(Input, { label: "E-mail", type: "email", value: f.email, onChange: v => set("email", v) }),
         React.createElement(Input, { label: "Telefon", value: f.telefon, onChange: v => set("telefon", v) }),
         React.createElement(Textarea, { label: "Pozn\u00E1mka", value: f.poznamka, onChange: v => set("poznamka", v), rows: 2 }),
+        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px",
+                padding: "10px", background: "#f8fafc", borderRadius: "8px" } },
+            React.createElement("span", { style: { fontSize: "13px", fontWeight: "600", color: "#374151" } }, "Stav zákazníka:"),
+            React.createElement("label", { style: { display: "flex", alignItems: "center", gap: "6px", cursor: "pointer" } },
+                React.createElement("input", { type: "checkbox", checked: f.aktivni !== false,
+                    onChange: e => set("aktivni", e.target.checked),
+                    style: { width: "16px", height: "16px" } }),
+                React.createElement("span", { style: { fontSize: "13px", color: f.aktivni !== false ? "#15803d" : "#dc2626", fontWeight: "600" } },
+                    f.aktivni !== false ? "✅ Aktivní" : "⛔ Neaktivní"))),
         React.createElement("div", { style: { display: "flex", gap: "12px", justifyContent: "flex-end" } },
             React.createElement(Btn, { onClick: onClose, variant: "secondary" }, "Zru\u0161it"),
             React.createElement(Btn, { onClick: () => { if (!f.nazev) {
                     alert("Vyplňte název");
                     return;
-                } onSave(f); } }, "\uD83D\uDCBE Ulo\u017Eit"))));
+                } onSave(Object.assign(Object.assign({}, f), { aktivni: f.aktivni !== false })); } }, "\uD83D\uDCBE Ulo\u017Eit"))));
 }
+// ============================================================
+// PŘIJATÉ FAKTURY
+// ============================================================
+function PrijateFaktury({ data, updateData, notify }) {
+    const [showForm, setShowForm] = (0, useState)(false);
+    const [editF, setEditF] = (0, useState)(null);
+    const [filterStav, setFilterStav] = (0, useState)("vse");
+    const [tab, setTab] = (0, useState)("faktury");
+    const [rok, setRok] = (0, useState)(new Date().getFullYear());
+
+    const faktury = (data.prijateFaktury || []).filter(f => {
+        const d = new Date(f.datumPrijeti || f.datumUskutecneni || 0);
+        if (d.getFullYear() !== rok) return false;
+        return filterStav === "vse" || f.stav === filterStav;
+    }).sort((a,b) => new Date(b.datumPrijeti||0) - new Date(a.datumPrijeti||0));
+
+    const novaFaktura = () => {
+        setEditF({ id: generateId(), cislo: "", dodavatelId: "", dodavatelNazev: "",
+            datumPrijeti: getToday(), datumSplatnosti: addDays(getToday(), 14),
+            datumUskutecneni: getToday(), castka: 0, dph: 0, celkem: 0,
+            sazba: 21, stav: "nezaplacena", popis: "", uplatnit: true });
+        setShowForm(true);
+    };
+
+    const save = (f) => {
+        updateData(prev => {
+            const ex = (prev.prijateFaktury||[]).findIndex(x => x.id === f.id);
+            const pf = ex >= 0 ? prev.prijateFaktury.map(x => x.id === f.id ? f : x) : [f, ...(prev.prijateFaktury||[])];
+            return Object.assign(Object.assign({}, prev), { prijateFaktury: pf });
+        });
+        setShowForm(false);
+        notify("Přijatá faktura uložena!");
+    };
+
+    const del = (id) => {
+        updateData(prev => (Object.assign(Object.assign({}, prev), { prijateFaktury: (prev.prijateFaktury||[]).filter(f => f.id !== id) })));
+        notify("Smazáno.");
+    };
+
+    const setStav = (id, stav) => {
+        updateData(prev => (Object.assign(Object.assign({}, prev), { prijateFaktury: (prev.prijateFaktury||[]).map(f => f.id === id ? Object.assign(Object.assign({}, f), { stav }) : f) })));
+    };
+
+    const totalNezaplaceno = (data.prijateFaktury||[]).filter(f => f.stav === "nezaplacena").reduce((s,f) => s + (f.celkem||0), 0);
+    const totalDphOdpocet = (data.prijateFaktury||[]).filter(f => f.uplatnit !== false).reduce((s,f) => s + (f.dph||0), 0);
+
+    return React.createElement("div", null,
+        React.createElement("div", { style: { display: "flex", gap: "8px", marginBottom: "20px" } },
+            ["faktury","dodavatele"].map(t => React.createElement("button", { key: t, onClick: () => setTab(t),
+                style: { padding: "8px 18px", borderRadius: "8px", border: "none", cursor: "pointer", fontWeight: "600",
+                    background: tab === t ? "#1a3a5c" : "#e5e7eb", color: tab === t ? "#fff" : "#374151" }},
+                t === "faktury" ? "\uD83D\uDCE5 P\u0159ijat\u00E9 faktury" : "\uD83C\uDFED Dodavatel\u00E9"))),
+        tab === "dodavatele" && React.createElement(DodavateleTab, { data: data, updateData: updateData, notify: notify }),
+        tab === "faktury" && React.createElement("div", null,
+            React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "16px", marginBottom: "20px" } },
+                React.createElement(StatCard, { label: "Celkem p\u0159ijat\u00FDch faktur", value: String((data.prijateFaktury||[]).length), color: "#1a3a5c" }),
+                React.createElement(StatCard, { label: "Nezaplaceno", value: formatCZK(totalNezaplaceno), color: "#dc2626" }),
+                React.createElement(StatCard, { label: "DPH k odpo\u010Dtu", value: formatCZK(totalDphOdpocet), color: "#16a34a" })),
+            React.createElement("div", { style: { display: "flex", gap: "6px", marginBottom: "8px", flexWrap: "wrap" } },
+                Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(y =>
+                    React.createElement("button", { key: y, onClick: () => setRok(y), style: {
+                        padding: "6px 14px", border: "1px solid", borderRadius: "20px", fontSize: "13px",
+                        fontWeight: "600", cursor: "pointer",
+                        borderColor: rok === y ? "#1a3a5c" : "#d1d5db",
+                        background: rok === y ? "#1a3a5c" : "#fff",
+                        color: rok === y ? "#fff" : "#374151"
+                    }}, y))),
+            React.createElement("div", { style: { display: "flex", gap: "10px", marginBottom: "16px", flexWrap: "wrap", alignItems: "center" } },
+                React.createElement(Btn, { onClick: novaFaktura }, "+ Nov\u00E1 p\u0159ijat\u00E1 faktura"),
+                React.createElement(AIScanBtn, {
+                    label: "\uD83E\uDD16 Na\u010D\u00EDst z faktury/dokladu",
+                    prompt: "Z tohoto obra\u017Eku nebo dokumentu extrahuj \u00FAdaje o faktu\u0159e. Vra\u0165 POUZE JSON s kl\u00ED\u010Di: cislo, dodavatelNazev, dodavatelIco, datumPrijeti (YYYY-MM-DD), datumSplatnosti (YYYY-MM-DD), castka (z\u00E1klad bez DPH), dph, celkem, sazba (21 nebo 12), popis.",
+                    onResult: (r) => {
+                        setEditF(Object.assign({ id: generateId(), stav: "nezaplacena", uplatnit: true,
+                            datumPrijeti: getToday(), datumSplatnosti: addDays(getToday(),14), datumUskutecneni: getToday() }, r));
+                        setShowForm(true);
+                    },
+                    notify: notify
+                }),
+                React.createElement("select", { value: filterStav, onChange: e => setFilterStav(e.target.value),
+                    style: { padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px" } },
+                    React.createElement("option", { value: "vse" }, "V\u0161echny"),
+                    React.createElement("option", { value: "nezaplacena" }, "Nezaplacen\u00E9"),
+                    React.createElement("option", { value: "zaplacena" }, "Zaplacen\u00E9"))),
+            React.createElement(Card, null,
+                React.createElement("table", { style: { width: "100%", borderCollapse: "collapse" } },
+                    React.createElement("thead", null,
+                        React.createElement("tr", { style: { background: "#f8fafc" } },
+                            ["\u010C\u00EDslo","Dodavatel","Datum","Splatnost","Z\u00E1klad","DPH","Celkem","DPH odpo\u010Det","Stav","Akce"].map(h =>
+                                React.createElement("th", { key: h, style: { padding: "10px 12px", textAlign: "left", fontSize: "12px",
+                                    fontWeight: "600", color: "#6b7280", borderBottom: "2px solid #e5e7eb" } }, h)))),
+                    React.createElement("tbody", null,
+                        faktury.map(f =>
+                            React.createElement("tr", { key: f.id, style: { borderBottom: "1px solid #f3f4f6" } },
+                                React.createElement("td", { style: { padding: "10px 12px", fontWeight: "600", fontSize: "13px" } }, f.cislo || "\u2014"),
+                                React.createElement("td", { style: { padding: "10px 12px", fontSize: "13px" } }, f.dodavatelNazev),
+                                React.createElement("td", { style: { padding: "10px 12px", fontSize: "13px", color: "#6b7280" } }, formatDate(f.datumPrijeti)),
+                                React.createElement("td", { style: { padding: "10px 12px", fontSize: "13px" } }, formatDate(f.datumSplatnosti)),
+                                React.createElement("td", { style: { padding: "10px 12px", fontSize: "13px" } }, formatCZK(f.castka||0)),
+                                React.createElement("td", { style: { padding: "10px 12px", fontSize: "13px" } }, formatCZK(f.dph||0)),
+                                React.createElement("td", { style: { padding: "10px 12px", fontWeight: "700", fontSize: "13px" } }, formatCZK(f.celkem||0)),
+                                React.createElement("td", { style: { padding: "10px 12px", textAlign: "center" } },
+                                    React.createElement("span", { style: { fontSize: "16px" } }, f.uplatnit !== false ? "\u2705" : "\u2014")),
+                                React.createElement("td", { style: { padding: "10px 12px" } },
+                                    React.createElement("select", { value: f.stav, onChange: e => setStav(f.id, e.target.value),
+                                        style: { padding: "4px 6px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "11px" } },
+                                        React.createElement("option", { value: "nezaplacena" }, "Nezaplacena"),
+                                        React.createElement("option", { value: "zaplacena" }, "\u2705 Zaplacena"))),
+                                React.createElement("td", { style: { padding: "10px 12px" } },
+                                    React.createElement("div", { style: { display: "flex", gap: "4px" } },
+                                        React.createElement(Btn, { onClick: () => { setEditF(f); setShowForm(true); }, variant: "secondary", small: true }, "\u270F\uFE0F"),
+                                        React.createElement(Btn, { onClick: () => del(f.id), variant: "danger", small: true }, "\uD83D\uDDD1")))
+                            )
+                        ),
+                        faktury.length === 0 && React.createElement("tr", null,
+                            React.createElement("td", { colSpan: "10", style: { textAlign: "center", color: "#9ca3af", padding: "40px" } }, "\u017D\u00E1dn\u00E9 p\u0159ijat\u00E9 faktury"))
+                    )
+                )
+            )
+        ),
+        showForm && editF && React.createElement(Modal, { title: "P\u0159ijat\u00E1 faktura", onClose: () => setShowForm(false), wide: true },
+            React.createElement(PrijataFakturaForm, { f: editF, dodavatele: data.dodavatele||[], onSave: save, onClose: () => setShowForm(false) }))
+    );
+}
+
+function PrijataFakturaForm({ f, dodavatele, onSave, onClose }) {
+    const [form, setForm] = (0, useState)(f);
+    const set = (k,v) => setForm(p => Object.assign(Object.assign({}, p), { [k]: v }));
+
+    const selectDod = (id) => {
+        const d = dodavatele.find(x => x.id === id);
+        if (d) setForm(p => Object.assign(Object.assign({}, p), { dodavatelId: d.id, dodavatelNazev: d.nazev, dodavatelIco: d.ico }));
+    };
+
+    const recalc = (field, val) => {
+        const upd = Object.assign(Object.assign({}, form), { [field]: parseFloat(val)||0 });
+        if (field === "castka" || field === "sazba") {
+            upd.dph = Math.round(upd.castka * (upd.sazba||21) / 100 * 100) / 100;
+            upd.celkem = upd.castka + upd.dph;
+        } else if (field === "celkem") {
+            upd.castka = Math.round(upd.celkem / (1 + (upd.sazba||21)/100) * 100) / 100;
+            upd.dph = upd.celkem - upd.castka;
+        }
+        setForm(upd);
+    };
+
+    return React.createElement("div", null,
+        React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" } },
+            React.createElement("div", null,
+                React.createElement(Select, { label: "Dodavatel", value: form.dodavatelId||"", onChange: selectDod,
+                    options: [{ value: "", label: "-- vyberte nebo napište --" }, ...(dodavatele||[]).map(d => ({ value: d.id, label: d.nazev }))] }),
+                React.createElement(Input, { label: "Název dodavatele", value: form.dodavatelNazev||"", onChange: v => set("dodavatelNazev",v), required: true }),
+                React.createElement(Input, { label: "IČO dodavatele", value: form.dodavatelIco||"", onChange: v => set("dodavatelIco",v) }),
+                React.createElement(Input, { label: "Číslo faktury", value: form.cislo||"", onChange: v => set("cislo",v) }),
+                React.createElement(Input, { label: "Popis / účel", value: form.popis||"", onChange: v => set("popis",v) })),
+            React.createElement("div", null,
+                React.createElement(Input, { label: "Datum přijetí", type: "date", value: form.datumPrijeti||"", onChange: v => set("datumPrijeti",v) }),
+                React.createElement(Input, { label: "Datum splatnosti", type: "date", value: form.datumSplatnosti||"", onChange: v => set("datumSplatnosti",v) }),
+                React.createElement(Input, { label: "Datum DUZP", type: "date", value: form.datumUskutecneni||"", onChange: v => set("datumUskutecneni",v) }),
+                React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" } },
+                    React.createElement(Input, { label: "Základ (Kč)", type: "number", value: form.castka||0, onChange: v => recalc("castka",v) }),
+                    React.createElement("div", { style: { marginBottom: "12px" } },
+                        React.createElement("label", { style: { display: "block", fontSize: "12px", fontWeight: "600", color: "#374151", marginBottom: "4px" } }, "DPH sazba"),
+                        React.createElement("select", { value: form.sazba||21, onChange: e => recalc("sazba", e.target.value),
+                            style: { width: "100%", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px" } },
+                            React.createElement("option", { value: 21 }, "21%"),
+                            React.createElement("option", { value: 12 }, "12%"),
+                            React.createElement("option", { value: 0 }, "0%"))),
+                    React.createElement(Input, { label: "DPH (Kč)", type: "number", value: form.dph||0, onChange: v => set("dph", parseFloat(v)||0) })),
+                React.createElement(Input, { label: "Celkem s DPH (Kč)", type: "number", value: form.celkem||0, onChange: v => recalc("celkem",v) }),
+                React.createElement("div", { style: { background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: "8px", padding: "10px", marginTop: "8px" } },
+                    React.createElement("label", { style: { display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" } },
+                        React.createElement("input", { type: "checkbox", checked: form.uplatnit !== false,
+                            onChange: e => set("uplatnit", e.target.checked),
+                            style: { width: "16px", height: "16px" } }),
+                        React.createElement("div", null,
+                            React.createElement("div", { style: { fontWeight: "600", fontSize: "13px" } }, "✅ Uplatnit DPH odpočet"),
+                            React.createElement("div", { style: { fontSize: "11px", color: "#6b7280" } }, "DPH se promítne do DPH přiznání jako odpočet na vstupu")))))),
+        React.createElement("div", { style: { display: "flex", gap: "12px", justifyContent: "flex-end" } },
+            React.createElement(Btn, { onClick: onClose, variant: "secondary" }, "Zrušit"),
+            React.createElement(Btn, { onClick: () => { if (!form.dodavatelNazev) { alert("Vyplňte dodavatele"); return; } onSave(form); } }, "💾 Uložit")));
+}
+
+function DodavateleTab({ data, updateData, notify }) {
+    const [showForm, setShowForm] = (0, useState)(false);
+    const [editD, setEditD] = (0, useState)(null);
+
+    const save = (d) => {
+        updateData(prev => {
+            const ex = (prev.dodavatele||[]).findIndex(x => x.id === d.id);
+            const dodavatele = ex >= 0 ? prev.dodavatele.map(x => x.id === d.id ? d : x) : [...(prev.dodavatele||[]), d];
+            return Object.assign(Object.assign({}, prev), { dodavatele });
+        });
+        setShowForm(false);
+        notify("Dodavatel uložen!");
+    };
+
+    const del = (id) => {
+        updateData(prev => (Object.assign(Object.assign({}, prev), { dodavatele: (prev.dodavatele||[]).filter(d => d.id !== id) })));
+        notify("Smazáno.");
+    };
+
+    return React.createElement("div", null,
+        React.createElement("div", { style: { display: "flex", gap: "10px", marginBottom: "16px" } },
+            React.createElement(Btn, { onClick: () => { setEditD({ id: generateId(), nazev: "", ico: "", dic: "", email: "", telefon: "", poznamka: "" }); setShowForm(true); } }, "+ Nový dodavatel"),
+            React.createElement(AIScanBtn, { label: "🤖 Načíst z vizitky", prompt: "Extrahuj kontaktn\u00ED \u00FAdaje dodavatele. Vra\u0165 POUZE JSON s kl\u00ED\u010Di: nazev, ico, dic, email, telefon, ulice, mesto, psc.", onResult: r => { setEditD(Object.assign({ id: generateId(), poznamka: "" }, r)); setShowForm(true); }, notify: notify })),
+        React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: "16px" } },
+            (data.dodavatele||[]).map(d => React.createElement(Card, { key: d.id },
+                React.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: "8px" } },
+                    React.createElement("h3", { style: { margin: 0, fontSize: "14px", color: "#1a3a5c" } }, d.nazev),
+                    React.createElement("div", { style: { display: "flex", gap: "4px" } },
+                        React.createElement(Btn, { onClick: () => { setEditD(d); setShowForm(true); }, variant: "secondary", small: true }, "✏️"),
+                        React.createElement(Btn, { onClick: () => del(d.id), variant: "danger", small: true }, "🗑"))),
+                React.createElement("div", { style: { fontSize: "12px", color: "#6b7280", lineHeight: "1.8" } },
+                    d.ico && React.createElement("div", null, "IČO: ", d.ico),
+                    d.email && React.createElement("div", null, "📧 ", d.email),
+                    d.telefon && React.createElement("div", null, "📞 ", d.telefon))))),
+        (data.dodavatele||[]).length === 0 && React.createElement(Card, null, React.createElement("p", { style: { textAlign: "center", color: "#9ca3af" } }, "Zatím žádní dodavatelé")),
+        showForm && editD && React.createElement(Modal, { title: editD.nazev || "Nový dodavatel", onClose: () => setShowForm(false) },
+            React.createElement("div", null,
+                React.createElement(Input, { label: "Název", value: editD.nazev||"", onChange: v => setEditD(p => Object.assign(Object.assign({}, p), { nazev: v })), required: true }),
+                React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" } },
+                    React.createElement(Input, { label: "IČO", value: editD.ico||"", onChange: v => setEditD(p => Object.assign(Object.assign({}, p), { ico: v })) }),
+                    React.createElement(Input, { label: "DIČ", value: editD.dic||"", onChange: v => setEditD(p => Object.assign(Object.assign({}, p), { dic: v })) })),
+                React.createElement(Input, { label: "Email", type: "email", value: editD.email||"", onChange: v => setEditD(p => Object.assign(Object.assign({}, p), { email: v })) }),
+                React.createElement(Input, { label: "Telefon", value: editD.telefon||"", onChange: v => setEditD(p => Object.assign(Object.assign({}, p), { telefon: v })) }),
+                React.createElement("div", { style: { display: "flex", gap: "12px", justifyContent: "flex-end", marginTop: "12px" } },
+                    React.createElement(Btn, { onClick: () => setShowForm(false), variant: "secondary" }, "Zrušit"),
+                    React.createElement(Btn, { onClick: () => { if (!editD.nazev) { alert("Vyplňte název"); return; } save(editD); } }, "💾 Uložit")))));
+}
+
 // ============================================================
 // DPH SECTION
 // ============================================================
@@ -1308,6 +1914,13 @@ function DPHSection({ data }) {
     const [rok, setRok] = (0, useState)(new Date().getFullYear());
     const [kvartal, setKvartal] = (0, useState)(Math.ceil((new Date().getMonth() + 1) / 3));
     const hlaseni = calcDPHHlaseni(data.faktury, rok, kvartal);
+    // Přijaté faktury DPH odpočet
+    const prijateDphOdpocet = (data.prijateFaktury||[]).filter(f => {
+        if (f.uplatnit === false) return false;
+        const d = new Date(f.datumUskutecneni || f.datumPrijeti);
+        const q = Math.ceil((d.getMonth()+1)/3);
+        return d.getFullYear() === rok && q === kvartal;
+    }).reduce((s,f) => s + (f.dph||0), 0);
     const printDPH = () => {
         const __html = `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8">
     <title>DPH Přiznání Q${kvartal}/${rok}</title>
@@ -1324,6 +1937,9 @@ function DPHSection({ data }) {
         <tr><td>2</td><td>Zdanitelná plnění 12%</td><td>${formatCZK(hlaseni.zaklad12)}</td><td>${formatCZK(hlaseni.dph12)}</td></tr>
         <tr><td>3</td><td>Osvobozená plnění 0%</td><td>${formatCZK(hlaseni.zaklad0)}</td><td>0,00 Kč</td></tr>
         <tr class="total"><td colspan="2"><strong>CELKEM K ODVODU</strong></td><td></td><td><strong>${formatCZK(hlaseni.celkemOdvod)}</strong></td></tr>
+        <tr style="background:#e0f2fe"><td colspan="4"><strong>Odpočet DPH na vstupu (přijaté faktury)</strong></td></tr>
+        <tr><td>40</td><td>DPH odpočet (přijaté faktury s nárokem)</td><td style="text-align:right">${formatCZK(prijateDphOdpocet)}</td><td></td></tr>
+        <tr class="total"><td colspan="2"><strong>DPH K ÚHRADĚ (odvod − odpočet)</strong></td><td></td><td><strong>${formatCZK(Math.max(0, hlaseni.celkemOdvod - prijateDphOdpocet))}</strong></td></tr>
       </tbody>
     </table>
     <h2>Zahrnuté faktury (${hlaseni.faktury.length})</h2>
@@ -1362,6 +1978,8 @@ function DPHSection({ data }) {
         React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: "16px", marginBottom: "24px" } },
             React.createElement(StatCard, { label: "Z\u00E1klad 21%", value: formatCZK(hlaseni.zaklad21), color: "#1a3a5c" }),
             React.createElement(StatCard, { label: "DPH 21%", value: formatCZK(hlaseni.dph21), color: "#dc2626" }),
+            React.createElement(StatCard, { label: "DPH odpočet (přijaté fakt.)", value: formatCZK(prijateDphOdpocet), color: "#16a34a" }),
+            React.createElement(StatCard, { label: "DPH K ÚHRADĚ", value: formatCZK(Math.max(0, hlaseni.celkemOdvod - prijateDphOdpocet)), color: "#7c3aed" }),
             React.createElement(StatCard, { label: "Z\u00E1klad 12%", value: formatCZK(hlaseni.zaklad12), color: "#1a3a5c" }),
             React.createElement(StatCard, { label: "DPH 12%", value: formatCZK(hlaseni.dph12), color: "#d97706" }),
             React.createElement(StatCard, { label: "Osvobozen. 0%", value: formatCZK(hlaseni.zaklad0), color: "#16a34a" }),
@@ -1422,6 +2040,11 @@ function DanZPrijmu({ data, updateData, notify }) {
     var _a;
     const [printHtml, setPrintHtml] = (0, useState)(null);
     const [rok, setRok] = (0, useState)(new Date().getFullYear());
+    const [metodaVydaju, setMetodaVydaju] = (0, useState)(data.metodaVydaju || "pausal");
+    const setMetoda = (m) => {
+        setMetodaVydaju(m);
+        updateData(prev => Object.assign(Object.assign({}, prev), { metodaVydaju: m }));
+    };
     // ── Náklady (uloženy v data.danNaklady[rok]) ──
     const allNaklady = data.danNaklady || {};
     const naklady = allNaklady[rok] || [];
@@ -1435,6 +2058,8 @@ function DanZPrijmu({ data, updateData, notify }) {
         { id: "auto_pausal", label: "Paušál na auto (§24 odst.2t)", hint: "Paušálně 5 000 Kč/měs = 60 000 Kč/rok" },
         { id: "odpisy", label: "Odpisy majetku", hint: "Dle odpisového plánu ze záložky Majetek" },
         { id: "dary", label: "Dary / bezúplatná plnění (§15)", hint: "Min. 1 000 Kč, max. 15% základu daně" },
+        { id: "darovani_krve", label: "Darování krve (§15 odst.1)", hint: "3 000 Kč za každý bezplatný odběr — lze i při paušálu!" },
+        { id: "darkovani_kostni_drene", label: "Darování kostní dřeně (§15 odst.1)", hint: "20 000 Kč za odběr — lze i při paušálu!" },
         { id: "penzijni", label: "Penzijní připojištění (§15 odst.5)", hint: "Max. 24 000 Kč/rok odpočet" },
         { id: "zivotni", label: "Životní pojištění (§15 odst.6)", hint: "Max. 24 000 Kč/rok odpočet" },
         { id: "dalsi_vzdelav", label: "Další vzdělávání / kurzy", hint: "Vzdělávání spojené s výkonem povolání" },
@@ -1468,8 +2093,24 @@ function DanZPrijmu({ data, updateData, notify }) {
     };
     const totalNaklady = naklady.reduce((s, n) => s + n.castka, 0);
     const rocni = calcRocniPrijmy(data.faktury, data.nemovitosti, rok);
-    // Přepočet daně s náklady
-    const zakladSNaklady = Math.max(0, rocni.celkemPrijmy - rocni.nemovitostVydaje - totalNaklady);
+
+    // Přijaté faktury jako skutečné náklady (pro metodou skutecne)
+    const prijateFakturyNaklady = (data.prijateFaktury||[]).filter(f => {
+        const d = new Date(f.datumPrijeti || f.datumUskutecneni);
+        return d.getFullYear() === rok;
+    }).reduce((s,f) => s + (f.castka||0), 0); // základ bez DPH (DPH je odpočet zvlášť)
+
+    // Výdajový paušál: 60% z příjmů ze živnosti (§7)
+    const pausalVydaje = Math.round(rocni.fakturacePrijmy * 0.60);
+
+    // Skutečné náklady = naklady zadané ručně + přijaté faktury základ
+    const skutecneNaklady = totalNaklady + prijateFakturyNaklady;
+
+    // Aktivní výdaje podle metody
+    const aktivniVydaje = metodaVydaju === "pausal" ? pausalVydaje : skutecneNaklady;
+
+    // Přepočet daně
+    const zakladSNaklady = Math.max(0, rocni.celkemPrijmy - rocni.nemovitostVydaje - aktivniVydaje);
     let danSNaklady = 0;
     if (zakladSNaklady <= DAN_Z_PRIJMU_FO.hranice) {
         danSNaklady = zakladSNaklady * 0.15;
@@ -1479,6 +2120,37 @@ function DanZPrijmu({ data, updateData, notify }) {
     }
     const danPoSlevachSNaklady = Math.max(0, danSNaklady - DAN_Z_PRIJMU_FO.slevaPoplatnik);
     const uspora = rocni.danPoSlevach - danPoSlevachSNaklady;
+
+    // SP + ZP výpočet
+    const spzpMin = SP_ZP_MIN[rok] || SP_ZP_MIN[2025];
+    const allNakladySP = data.danNaklady || {};
+    const nakladySP = allNakladySP[rok] || [];
+
+    // Ruční zálohy zadané uživatelem (uložené v danNaklady jako typ sp_zaloha/zp_zaloha)
+    const spZalohaItem = nakladySP.find(n => n.typ === "sp_zaloha");
+    const zpZalohaItem = nakladySP.find(n => n.typ === "zp_zaloha");
+    const spMesicniZaloha = spZalohaItem ? spZalohaItem.castka : spzpMin.sp;
+    const zpMesicniZaloha = zpZalohaItem ? zpZalohaItem.castka : spzpMin.zp;
+    const spZaplaceno = spMesicniZaloha * 12;
+    const zpZaplaceno = zpMesicniZaloha * 12;
+
+    // Skutečný roční předpis SP+ZP z příjmů
+    const danZakladFakturace = Math.max(0, rocni.fakturacePrijmy - aktivniVydaje);
+    const spVZ = Math.max(danZakladFakturace * SP_VZ_PODIL, spzpMin.sp * 12);
+    const zpVZ = Math.max(danZakladFakturace * ZP_VZ_PODIL, spzpMin.zp * 12);
+    const spPredpis = Math.ceil(spVZ * SP_SAZBA);
+    const zpPredpis = Math.ceil(zpVZ * ZP_SAZBA);
+    const spNedoplatek = spPredpis - spZaplaceno;
+    const zpNedoplatek = zpPredpis - zpZaplaceno;
+    const celkemOdvody = danPoSlevachSNaklady + spPredpis + zpPredpis;
+    const cistyPrijem = rocni.celkemPrijmy - celkemOdvody;
+
+    // Výpočet pro druhou metodu (pro srovnání)
+    const zakladPausal = Math.max(0, rocni.celkemPrijmy - rocni.nemovitostVydaje - pausalVydaje);
+    const zakladSkutecne = Math.max(0, rocni.celkemPrijmy - rocni.nemovitostVydaje - skutecneNaklady);
+    const calcDan = (z) => { const d = z <= DAN_Z_PRIJMU_FO.hranice ? z*0.15 : DAN_Z_PRIJMU_FO.hranice*0.15+(z-DAN_Z_PRIJMU_FO.hranice)*0.23; return Math.max(0, d - DAN_Z_PRIJMU_FO.slevaPoplatnik); };
+    const danPausal = calcDan(zakladPausal);
+    const danSkutecne = calcDan(zakladSkutecne);
     const printDan = () => {
         const nakl_rows = naklady.map(n => `<tr><td>${n.label}</td><td>${n.popis}</td><td style="text-align:right">${formatCZK(n.castka)}</td></tr>`).join("");
         const danHtml = `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8">
@@ -1522,12 +2194,105 @@ function DanZPrijmu({ data, updateData, notify }) {
                     color: rok === y ? "#fff" : "#374151"
                 } }, y)))),
             React.createElement("div", { style: { fontSize: "11px", color: "#9ca3af" } }, "Zda\u0148ovac\u00ED rok")),
-        React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: "12px", marginBottom: "20px" } },
+
+        // Přepínač metody výdajů
+        React.createElement("div", { style: { background: "#f8fafc", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "16px", marginBottom: "20px" } },
+            React.createElement("div", { style: { fontSize: "13px", fontWeight: "700", color: "#1a3a5c", marginBottom: "12px" } }, "⚙️ Metoda uplatnění výdajů"),
+            React.createElement("div", { style: { display: "flex", gap: "10px", marginBottom: "12px" } },
+                React.createElement("button", { onClick: () => setMetoda("pausal"),
+                    style: { flex: 1, padding: "12px", borderRadius: "8px", border: "2px solid",
+                        borderColor: metodaVydaju === "pausal" ? "#1a3a5c" : "#e5e7eb",
+                        background: metodaVydaju === "pausal" ? "#1a3a5c" : "#fff",
+                        color: metodaVydaju === "pausal" ? "#fff" : "#374151",
+                        cursor: "pointer", fontWeight: "700", fontSize: "13px" } },
+                    React.createElement("div", null, "📊 Výdajový paušál 60%"),
+                    React.createElement("div", { style: { fontSize: "11px", opacity: 0.8, marginTop: "4px" } }, formatCZK(pausalVydaje), " z příjmů")),
+                React.createElement("button", { onClick: () => setMetoda("skutecne"),
+                    style: { flex: 1, padding: "12px", borderRadius: "8px", border: "2px solid",
+                        borderColor: metodaVydaju === "skutecne" ? "#7c3aed" : "#e5e7eb",
+                        background: metodaVydaju === "skutecne" ? "#7c3aed" : "#fff",
+                        color: metodaVydaju === "skutecne" ? "#fff" : "#374151",
+                        cursor: "pointer", fontWeight: "700", fontSize: "13px" } },
+                    React.createElement("div", null, "🧾 Skutečné náklady"),
+                    React.createElement("div", { style: { fontSize: "11px", opacity: 0.8, marginTop: "4px" } }, formatCZK(skutecneNaklady), " celkem"))),
+            // Srovnání obou metod
+            React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" } },
+                React.createElement("div", { style: { padding: "10px", background: metodaVydaju==="pausal" ? "#dbeafe" : "#f8fafc",
+                    borderRadius: "8px", border: metodaVydaju==="pausal" ? "2px solid #3b82f6" : "1px solid #e5e7eb" } },
+                    React.createElement("div", { style: { fontSize: "11px", color: "#6b7280" } }, "Paušál 60% — daň:"),
+                    React.createElement("div", { style: { fontSize: "18px", fontWeight: "700", color: "#1a3a5c" } }, formatCZK(danPausal))),
+                React.createElement("div", { style: { padding: "10px", background: metodaVydaju==="skutecne" ? "#ede9fe" : "#f8fafc",
+                    borderRadius: "8px", border: metodaVydaju==="skutecne" ? "2px solid #7c3aed" : "1px solid #e5e7eb" } },
+                    React.createElement("div", { style: { fontSize: "11px", color: "#6b7280" } }, "Skutečné náklady — daň:"),
+                    React.createElement("div", { style: { fontSize: "18px", fontWeight: "700", color: "#7c3aed" } }, formatCZK(danSkutecne))))),
+
+        React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: "12px", marginBottom: "20px" } },
             React.createElement(StatCard, { label: "P\u0159\u00EDjmy celkem", value: formatCZK(rocni.celkemPrijmy), color: "#1a3a5c" }),
             React.createElement(StatCard, { label: "V\u00FDdaje nemovitosti", value: formatCZK(rocni.nemovitostVydaje), color: "#dc2626" }),
-            React.createElement(StatCard, { label: "Odpo\u010Dty / n\u00E1klady", value: formatCZK(totalNaklady), color: "#d97706" }),
+            React.createElement(StatCard, { label: metodaVydaju === "pausal" ? "Pau\u0161\u00E1l 60%" : "Skute\u010Dn\u00E9 n\u00E1klady", value: formatCZK(aktivniVydaje), color: "#d97706" }),
             React.createElement(StatCard, { label: "Z\u00E1klad dan\u011B", value: formatCZK(zakladSNaklady), color: "#7c3aed" }),
-            React.createElement(StatCard, { label: "DA\u0147 K \u00DAHRAD\u011A", value: formatCZK(danPoSlevachSNaklady), color: "#dc2626", sub: uspora > 0 ? `Úspora oproti bez odpočtů: ${formatCZK(uspora)}` : undefined })),
+            React.createElement(StatCard, { label: "Da\u0148 z p\u0159\u00EDjm\u016F", value: formatCZK(danPoSlevachSNaklady), color: "#dc2626" }),
+            React.createElement(StatCard, { label: "SP ro\u010Dn\u011B (p\u0159edpis)", value: formatCZK(spPredpis), color: "#0369a1", sub: spNedoplatek > 0 ? "Nedoplatek: " + formatCZK(spNedoplatek) : spNedoplatek < 0 ? "P\u0159eplatek: " + formatCZK(-spNedoplatek) : "Vyrovn\u00E1no" }),
+            React.createElement(StatCard, { label: "ZP ro\u010Dn\u011B (p\u0159edpis)", value: formatCZK(zpPredpis), color: "#0891b2", sub: zpNedoplatek > 0 ? "Nedoplatek: " + formatCZK(zpNedoplatek) : zpNedoplatek < 0 ? "P\u0159eplatek: " + formatCZK(-zpNedoplatek) : "Vyrovn\u00E1no" }),
+            React.createElement(StatCard, { label: "CELKEM ODVODY", value: formatCZK(celkemOdvody), color: "#b91c1c", sub: "Da\u0148 + SP + ZP" }),
+            React.createElement(StatCard, { label: "\u010CIST\u00DD P\u0158\u00CDJEM", value: formatCZK(cistyPrijem), color: "#15803d", sub: "Po v\u0161ech odvodech" })),
+        // SP/ZP zálohy sekce
+        React.createElement(Card, { style: { marginBottom: "20px", background: "#f0f9ff", border: "1px solid #bae6fd" } },
+            React.createElement("h3", { style: { marginTop: 0, color: "#0369a1" } }, "🏥 Sociální a zdravotní pojištění OSVČ — ", rok),
+            React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" } },
+                // SP
+                React.createElement("div", null,
+                    React.createElement("div", { style: { fontWeight: "700", color: "#0369a1", marginBottom: "8px" } }, "📋 Sociální pojištění (SP)"),
+                    React.createElement("div", { style: { fontSize: "12px", color: "#6b7280", marginBottom: "6px" } },
+                        "Min. záloha ", rok, ": ", React.createElement("strong", null, formatCZK(spzpMin.sp), "/měs"),
+                        " | Splatnost: do konce měsíce"),
+                    React.createElement("div", { style: { display: "flex", gap: "8px", alignItems: "center", marginBottom: "6px" } },
+                        React.createElement("label", { style: { fontSize: "13px", fontWeight: "600", color: "#374151", whiteSpace: "nowrap" } }, "Vaše záloha:"),
+                        React.createElement("input", { type: "number", value: spMesicniZaloha,
+                            onChange: e => {
+                                const val = parseFloat(e.target.value) || 0;
+                                const updated = naklady.filter(n => n.typ !== "sp_zaloha");
+                                saveNaklady([...updated, { id: "sp_zaloha", typ: "sp_zaloha", label: "SP záloha", popis: "Mě\u0161\u00ED\u010Dn\u00ED z\u00E1loha SP", castka: val }]);
+                            },
+                            style: { width: "110px", padding: "6px 8px", border: "2px solid #0369a1", borderRadius: "6px", fontSize: "14px", fontWeight: "700" } }),
+                        React.createElement("span", { style: { fontSize: "12px", color: "#6b7280" } }, "Kč/měs")),
+                    React.createElement("div", { style: { fontSize: "12px", lineHeight: "1.8", background: "#fff", borderRadius: "6px", padding: "8px", border: "1px solid #e0f2fe" } },
+                        React.createElement("div", null, "Zaplaceno (×12): ", React.createElement("strong", null, formatCZK(spZaplaceno))),
+                        React.createElement("div", null, "Roční předpis ze zisku: ", React.createElement("strong", null, formatCZK(spPredpis))),
+                        React.createElement("div", { style: { fontWeight: "700", color: spNedoplatek > 0 ? "#dc2626" : "#16a34a" } },
+                            spNedoplatek > 0 ? "⚠️ Nedoplatek: " : spNedoplatek < 0 ? "✅ Přeplatek: " : "✅ ",
+                            spNedoplatek !== 0 ? formatCZK(Math.abs(spNedoplatek)) : "Vyrovnáno"))),
+                // ZP
+                React.createElement("div", null,
+                    React.createElement("div", { style: { fontWeight: "700", color: "#0891b2", marginBottom: "8px" } }, "🏥 Zdravotní pojištění (ZP)"),
+                    React.createElement("div", { style: { fontSize: "12px", color: "#6b7280", marginBottom: "6px" } },
+                        "Min. záloha ", rok, ": ", React.createElement("strong", null, formatCZK(spzpMin.zp), "/měs"),
+                        " | Splatnost: do 8. dne příštího měsíce"),
+                    React.createElement("div", { style: { display: "flex", gap: "8px", alignItems: "center", marginBottom: "6px" } },
+                        React.createElement("label", { style: { fontSize: "13px", fontWeight: "600", color: "#374151", whiteSpace: "nowrap" } }, "Vaše záloha:"),
+                        React.createElement("input", { type: "number", value: zpMesicniZaloha,
+                            onChange: e => {
+                                const val = parseFloat(e.target.value) || 0;
+                                const updated = naklady.filter(n => n.typ !== "zp_zaloha");
+                                saveNaklady([...updated, { id: "zp_zaloha", typ: "zp_zaloha", label: "ZP záloha", popis: "Mě\u0161\u00ED\u010Dn\u00ED z\u00E1loha ZP", castka: val }]);
+                            },
+                            style: { width: "110px", padding: "6px 8px", border: "2px solid #0891b2", borderRadius: "6px", fontSize: "14px", fontWeight: "700" } }),
+                        React.createElement("span", { style: { fontSize: "12px", color: "#6b7280" } }, "Kč/měs")),
+                    React.createElement("div", { style: { fontSize: "12px", lineHeight: "1.8", background: "#fff", borderRadius: "6px", padding: "8px", border: "1px solid #e0f2fe" } },
+                        React.createElement("div", null, "Zaplaceno (×12): ", React.createElement("strong", null, formatCZK(zpZaplaceno))),
+                        React.createElement("div", null, "Roční předpis ze zisku: ", React.createElement("strong", null, formatCZK(zpPredpis))),
+                        React.createElement("div", { style: { fontWeight: "700", color: zpNedoplatek > 0 ? "#dc2626" : "#16a34a" } },
+                            zpNedoplatek > 0 ? "⚠️ Nedoplatek: " : zpNedoplatek < 0 ? "✅ Přeplatek: " : "✅ ",
+                            zpNedoplatek !== 0 ? formatCZK(Math.abs(zpNedoplatek)) : "Vyrovnáno")))),
+            React.createElement("div", { style: { marginTop: "12px", background: "#1a3a5c", borderRadius: "8px", padding: "12px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" } },
+                React.createElement("div", { style: { color: "#fff" } },
+                    React.createElement("div", { style: { fontSize: "12px", opacity: 0.8 } }, "Celkové roční odvody státu"),
+                    React.createElement("div", { style: { fontSize: "22px", fontWeight: "900" } }, formatCZK(celkemOdvody)),
+                    React.createElement("div", { style: { fontSize: "11px", opacity: 0.7 } }, "Daň ", formatCZK(danPoSlevachSNaklady), " + SP ", formatCZK(spPredpis), " + ZP ", formatCZK(zpPredpis))),
+                React.createElement("div", { style: { color: "#fff", textAlign: "right" } },
+                    React.createElement("div", { style: { fontSize: "12px", opacity: 0.8 } }, "Čistý příjem po odvodech"),
+                    React.createElement("div", { style: { fontSize: "22px", fontWeight: "900", color: "#86efac" } }, formatCZK(cistyPrijem))))),
+
         React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" } },
             React.createElement(Card, null,
                 React.createElement("h3", { style: { marginTop: 0, color: "#1a3a5c" } },
@@ -1538,7 +2303,7 @@ function DanZPrijmu({ data, updateData, notify }) {
                         ["Příjmy z fakturace (§7)", formatCZK(rocni.fakturacePrijmy), false],
                         ["Příjmy z pronájmu (§9)", formatCZK(rocni.nemovitostPrijmy), false],
                         ["Výdaje (nemovitosti)", `- ${formatCZK(rocni.nemovitostVydaje)}`, false],
-                        ["Odpočty a náklady", `- ${formatCZK(totalNaklady)}`, false, "#d97706"],
+                        [metodaVydaju === "pausal" ? "Výdajový paušál 60%" : "Skutečné náklady", `- ${formatCZK(aktivniVydaje)}`, false, "#d97706"],
                         ["= Základ daně", formatCZK(zakladSNaklady), true],
                         ["Daň 15% (do 1 582 812 Kč)", formatCZK(Math.min(zakladSNaklady, DAN_Z_PRIJMU_FO.hranice) * 0.15), false],
                         ["Daň 23% (nad 1 582 812 Kč)", formatCZK(Math.max(0, zakladSNaklady - DAN_Z_PRIJMU_FO.hranice) * 0.23), false],
@@ -2052,6 +2817,270 @@ function RTDokumenty({ p, onUpdate, notify }) {
         })));
 }
 // ── Property Detail ──
+// ── Nájemníci — historie + měřidla ────────────────────────────
+// ============================================================
+// MĚŘIDLA TYPY
+// ============================================================
+const MERIDLA_TYPY = ["Voda studená", "Tepla voda (TUV)", "Teplo", "Plyn"];
+
+// ============================================================
+// RTNajemnici - nájemníci uvnitř detail nemovitosti
+// ============================================================
+function RTNajemnici({ p, onUpdate, notify }) {
+    const najemnici = (p.najemnici || []);
+    const [showForm, setShowForm] = (0, useState)(false);
+    const [editN, setEditN] = (0, useState)(null);
+    const [showMeridla, setShowMeridla] = (0, useState)(null);
+
+    const save = (n) => {
+        const list = najemnici.find(x => x.id === n.id) ? najemnici.map(x => x.id === n.id ? n : x) : [...najemnici, n];
+        onUpdate(Object.assign(Object.assign({}, p), { najemnici: list }));
+        setShowForm(false);
+        notify("Nájemník uložen!");
+    };
+    const del = (id) => {
+        onUpdate(Object.assign(Object.assign({}, p), { najemnici: najemnici.filter(n => n.id !== id) }));
+        notify("Nájemník smazán.");
+    };
+    const saveMeridla = (id, meridla) => {
+        const list = najemnici.map(n => n.id === id ? Object.assign(Object.assign({}, n), { meridla }) : n);
+        onUpdate(Object.assign(Object.assign({}, p), { najemnici: list }));
+        notify("Měřidla uložena!");
+    };
+    const aktivni = najemnici.filter(n => !n.datumOdchodu || new Date(n.datumOdchodu) >= new Date());
+    const historie = najemnici.filter(n => n.datumOdchodu && new Date(n.datumOdchodu) < new Date());
+
+    return React.createElement("div", null,
+        React.createElement("div", { style: { display: "flex", gap: "10px", marginBottom: "16px", flexWrap: "wrap" } },
+            React.createElement(Btn, { onClick: () => { setEditN({ id: generateId(), jmeno: "", telefon: "", email: "", nemovitostId: p.id, datumNastupu: getToday(), datumOdchodu: "", najem: 0, kauce: 0, meridla: [], poznamka: "" }); setShowForm(true); } }, "+ Přidat nájemníka"),
+            React.createElement(AIScanBtn, { label: "🤖 Ze smlouvy", prompt: "Extrahuj z najemni smlouvy: jmeno, telefon, email, datumNastupu (YYYY-MM-DD), datumOdchodu (YYYY-MM-DD nebo prazdne), najem (cislo Kc/mes), kauce (cislo Kc), poznamka. JSON.", onResult: r => { setEditN(Object.assign({ id: generateId(), meridla: [], nemovitostId: p.id }, r)); setShowForm(true); }, notify: notify })),
+
+        aktivni.length > 0 && React.createElement("div", { style: { marginBottom: "20px" } },
+            React.createElement("h4", { style: { color: "#15803d", margin: "0 0 12px" } }, "✅ Aktivní nájemníci"),
+            aktivni.map(n => React.createElement(Card, { key: n.id, style: { marginBottom: "10px", borderLeft: "4px solid #16a34a" } },
+                React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" } },
+                    React.createElement("div", null,
+                        React.createElement("div", { style: { fontWeight: "700", fontSize: "15px" } }, n.jmeno),
+                        React.createElement("div", { style: { fontSize: "12px", color: "#6b7280", lineHeight: "1.8" } },
+                            n.telefon && React.createElement("span", null, "📞 ", n.telefon, " "),
+                            n.email && React.createElement("span", null, "📧 ", n.email),
+                            React.createElement("br", null),
+                            "Nástup: ", formatDate(n.datumNastupu),
+                            React.createElement("br", null),
+                            "Nájem: ", React.createElement("strong", null, formatCZK(n.najem), "/měs"),
+                            " | Kauce: ", formatCZK(n.kauce))),
+                    React.createElement("div", { style: { display: "flex", gap: "4px", flexWrap: "wrap" } },
+                        React.createElement(Btn, { onClick: () => setShowMeridla(showMeridla === n.id ? null : n.id), variant: "secondary", small: true }, "🔢 Měřidla"),
+                        React.createElement(Btn, { onClick: () => { setEditN(n); setShowForm(true); }, variant: "secondary", small: true }, "✏️"),
+                        React.createElement(Btn, { onClick: () => del(n.id), variant: "danger", small: true }, "🗑"))),
+                showMeridla === n.id && React.createElement(MeridlaPanel, { najemnik: n, onSave: (m) => saveMeridla(n.id, m), notify: notify })))),
+
+        React.createElement("div", null,
+            React.createElement("h4", { style: { color: "#6b7280", margin: "0 0 12px" } }, "📋 Historie (", historie.length, ")"),
+            historie.length === 0 && React.createElement("p", { style: { color: "#9ca3af", fontSize: "13px" } }, "Zatím žádná historie."),
+            historie.map(n => React.createElement(Card, { key: n.id, style: { marginBottom: "8px", opacity: 0.7, borderLeft: "4px solid #9ca3af" } },
+                React.createElement("div", { style: { display: "flex", justifyContent: "space-between" } },
+                    React.createElement("div", null,
+                        React.createElement("div", { style: { fontWeight: "600", fontSize: "13px" } }, n.jmeno),
+                        React.createElement("div", { style: { fontSize: "12px", color: "#6b7280" } },
+                            formatDate(n.datumNastupu), " — ", formatDate(n.datumOdchodu), " | ", formatCZK(n.najem), "/měs")),
+                    React.createElement("div", { style: { display: "flex", gap: "4px" } },
+                        React.createElement(Btn, { onClick: () => setShowMeridla(showMeridla === n.id ? null : n.id), variant: "secondary", small: true }, "🔢"),
+                        React.createElement(Btn, { onClick: () => del(n.id), variant: "danger", small: true }, "🗑")))
+            ))),
+
+        showForm && editN && React.createElement(Modal, { title: editN.jmeno || "Nový nájemník", onClose: () => setShowForm(false), wide: true },
+            React.createElement(NajemnikForm, { n: editN, onSave: save, onClose: () => setShowForm(false) }))
+    );
+}
+
+// ============================================================
+// MeridlaPanel - správa měřidel u nájemníka
+// ============================================================
+function MeridlaPanel({ najemnik, onSave, notify }) {
+    const [meridla, setMeridla] = (0, useState)(najemnik.meridla || []);
+    const [novyTyp, setNovyTyp] = (0, useState)(MERIDLA_TYPY[0]);
+    const [novyStav, setNovyStav] = (0, useState)("");
+    const [novyDatum, setNovyDatum] = (0, useState)(getToday());
+    const [novyPozn, setNovyPozn] = (0, useState)("");
+
+    const add = () => {
+        if (!novyStav) { alert("Zadejte stav měřidla"); return; }
+        const updated = [...meridla, { id: generateId(), typ: novyTyp, stav: parseFloat(novyStav.replace(",","."))||novyStav, datum: novyDatum, poznamka: novyPozn }];
+        setMeridla(updated);
+        onSave(updated);
+        setNovyStav(""); setNovyPozn("");
+        notify("Měřidlo přidáno!");
+    };
+    const del = (id) => {
+        const updated = meridla.filter(m => m.id !== id);
+        setMeridla(updated);
+        onSave(updated);
+    };
+
+    return React.createElement("div", { style: { marginTop: "12px", background: "#f0f9ff", borderRadius: "8px", padding: "12px", border: "1px solid #bae6fd" } },
+        React.createElement("div", { style: { fontWeight: "700", fontSize: "13px", marginBottom: "10px", color: "#0369a1" } }, "🔢 Stavy měřidel — ", najemnik.jmeno),
+        React.createElement("div", { style: { display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "10px", alignItems: "flex-end" } },
+            React.createElement("div", null,
+                React.createElement("div", { style: { fontSize: "11px", color: "#6b7280", marginBottom: "2px" } }, "Typ měřidla"),
+                React.createElement("select", { value: novyTyp, onChange: e => setNovyTyp(e.target.value), style: { padding: "6px 8px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "12px" } },
+                    MERIDLA_TYPY.map(t => React.createElement("option", { key: t }, t)))),
+            React.createElement("div", null,
+                React.createElement("div", { style: { fontSize: "11px", color: "#6b7280", marginBottom: "2px" } }, "Stav (číslo)"),
+                React.createElement("input", { value: novyStav, onChange: e => setNovyStav(e.target.value), placeholder: "např. 1234.56", style: { width: "100px", padding: "6px 8px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "12px" } })),
+            React.createElement("div", null,
+                React.createElement("div", { style: { fontSize: "11px", color: "#6b7280", marginBottom: "2px" } }, "Datum"),
+                React.createElement("input", { type: "date", value: novyDatum, onChange: e => setNovyDatum(e.target.value), style: { padding: "6px 8px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "12px" } })),
+            React.createElement("div", null,
+                React.createElement("div", { style: { fontSize: "11px", color: "#6b7280", marginBottom: "2px" } }, "Poznámka"),
+                React.createElement("select", { value: novyPozn, onChange: e => setNovyPozn(e.target.value), style: { padding: "6px 8px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "12px" } },
+                    React.createElement("option", { value: "nástup" }, "Nástup nájemníka"),
+                    React.createElement("option", { value: "odchod" }, "Odchod nájemníka"),
+                    React.createElement("option", { value: "kontrola" }, "Pravidelná kontrola"),
+                    React.createElement("option", { value: "" }, "Jiné"))),
+            React.createElement(Btn, { onClick: add, small: true }, "+ Přidat záznam")),
+        meridla.length > 0 && React.createElement("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: "12px" } },
+            React.createElement("thead", null,
+                React.createElement("tr", { style: { background: "#e0f2fe" } },
+                    ["Typ", "Stav", "Datum", "Poznámka", ""].map(h => React.createElement("th", { key: h, style: { padding: "6px 8px", textAlign: "left" } }, h)))),
+            React.createElement("tbody", null,
+                [...meridla].sort((a,b) => new Date(b.datum) - new Date(a.datum)).map(m =>
+                    React.createElement("tr", { key: m.id, style: { borderBottom: "1px solid #e5e7eb" } },
+                        React.createElement("td", { style: { padding: "5px 8px", fontWeight: "600" } }, m.typ),
+                        React.createElement("td", { style: { padding: "5px 8px", fontFamily: "monospace", fontWeight: "700" } }, m.stav),
+                        React.createElement("td", { style: { padding: "5px 8px", color: "#6b7280" } }, formatDate(m.datum)),
+                        React.createElement("td", { style: { padding: "5px 8px", color: "#6b7280" } }, m.poznamka || ""),
+                        React.createElement("td", { style: { padding: "5px 8px" } },
+                            React.createElement(Btn, { onClick: () => del(m.id), variant: "danger", small: true }, "×")))))));
+}
+
+// ============================================================
+// NajemnikForm - formulář pro nájemníka
+// ============================================================
+function NajemnikForm({ n, onSave, onClose, properties }) {
+    const [f, setF] = (0, useState)(n);
+    const set = (k, v) => setF(p => Object.assign(Object.assign({}, p), { [k]: v }));
+    return React.createElement("div", null,
+        React.createElement(Input, { label: "Jméno a příjmení *", value: f.jmeno || "", onChange: v => set("jmeno", v), required: true }),
+        React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" } },
+            React.createElement(Input, { label: "Telefon", value: f.telefon || "", onChange: v => set("telefon", v) }),
+            React.createElement(Input, { label: "Email", type: "email", value: f.email || "", onChange: v => set("email", v) })),
+        properties && React.createElement(Select, { label: "Nemovitost", value: f.nemovitostId || "", onChange: v => set("nemovitostId", v),
+            options: [{ value: "", label: "— nevybráno —" }, ...(properties || []).map(p => ({ value: p.id, label: p.name }))] }),
+        React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" } },
+            React.createElement(Input, { label: "Datum nástupu", type: "date", value: f.datumNastupu || "", onChange: v => set("datumNastupu", v) }),
+            React.createElement(Input, { label: "Datum odchodu (prázdné = dosud)", type: "date", value: f.datumOdchodu || "", onChange: v => set("datumOdchodu", v) })),
+        React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" } },
+            React.createElement(Input, { label: "Měsíční nájem (Kč)", type: "number", value: f.najem || 0, onChange: v => set("najem", parseFloat(v) || 0) }),
+            React.createElement(Input, { label: "Kauce (Kč)", type: "number", value: f.kauce || 0, onChange: v => set("kauce", parseFloat(v) || 0) })),
+        React.createElement(Input, { label: "Poznámka", value: f.poznamka || "", onChange: v => set("poznamka", v) }),
+        React.createElement("div", { style: { display: "flex", gap: "12px", justifyContent: "flex-end", marginTop: "8px" } },
+            React.createElement(Btn, { onClick: onClose, variant: "secondary" }, "Zrušit"),
+            React.createElement(Btn, { onClick: () => { if (!f.jmeno) { alert("Vyplňte jméno"); return; } onSave(f); } }, "💾 Uložit")));
+}
+
+// ============================================================
+// NajemniciGlobal - hlavní záložka nájemníci
+// ============================================================
+function NajemniciGlobal({ data, updateData, notify, setActiveTab }) {
+    const [filter, setFilter] = (0, useState)("aktivni");
+    const [showForm, setShowForm] = (0, useState)(false);
+    const [editN, setEditN] = (0, useState)(null);
+    const [showMeridla, setShowMeridla] = (0, useState)(null);
+
+    const vsichniNajemnici = data.najemnici || [];
+    const properties = (data.nemovitosti && data.nemovitosti.properties) || [];
+
+    const isAktivni = (n) => !n.datumOdchodu || new Date(n.datumOdchodu) >= new Date();
+
+    const filtered = vsichniNajemnici.filter(n => {
+        if (filter === "aktivni") return isAktivni(n);
+        if (filter === "historicky") return !isAktivni(n);
+        return true;
+    }).sort((a, b) => new Date(b.datumNastupu||0) - new Date(a.datumNastupu||0));
+
+    const save = (n) => {
+        updateData(prev => {
+            const list = (prev.najemnici || []);
+            const updated = list.find(x => x.id === n.id) ? list.map(x => x.id === n.id ? n : x) : [n, ...list];
+            return Object.assign(Object.assign({}, prev), { najemnici: updated });
+        });
+        setShowForm(false);
+        notify("Nájemník uložen!");
+    };
+    const del = (id) => {
+        updateData(prev => Object.assign(Object.assign({}, prev), { najemnici: (prev.najemnici || []).filter(n => n.id !== id) }));
+        notify("Nájemník smazán.");
+    };
+    const saveMeridla = (id, meridla) => {
+        updateData(prev => Object.assign(Object.assign({}, prev), { najemnici: (prev.najemnici || []).map(n => n.id === id ? Object.assign(Object.assign({}, n), { meridla }) : n) }));
+        notify("Měřidla uložena!");
+    };
+
+    const getNemovitost = (id) => properties.find(p => p.id === id);
+    const pocetAktivnich = vsichniNajemnici.filter(isAktivni).length;
+    const celkemNajem = vsichniNajemnici.filter(isAktivni).reduce((s, n) => s + (n.najem || 0), 0);
+
+    return React.createElement("div", null,
+        // Stat cards
+        React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "16px", marginBottom: "20px" } },
+            React.createElement(StatCard, { label: "Aktivní nájemníci", value: String(pocetAktivnich), color: "#16a34a" }),
+            React.createElement(StatCard, { label: "Celkem nájemníků", value: String(vsichniNajemnici.length), color: "#1a3a5c" }),
+            React.createElement(StatCard, { label: "Příjmy z nájmu/měs", value: formatCZK(celkemNajem), color: "#d97706" })),
+
+        // Toolbar
+        React.createElement("div", { style: { display: "flex", gap: "10px", marginBottom: "16px", flexWrap: "wrap", alignItems: "center" } },
+            React.createElement(Btn, { onClick: () => { setEditN({ id: generateId(), jmeno: "", telefon: "", email: "", nemovitostId: "", datumNastupu: getToday(), datumOdchodu: "", najem: 0, kauce: 0, meridla: [], poznamka: "" }); setShowForm(true); } }, "+ Nový nájemník"),
+            React.createElement(AIScanBtn, { label: "🤖 Ze smlouvy", prompt: "Extrahuj z najemni smlouvy: jmeno, telefon, email, datumNastupu (YYYY-MM-DD), datumOdchodu (YYYY-MM-DD nebo prazdne), najem (cislo), kauce (cislo), poznamka. JSON.", onResult: r => { setEditN(Object.assign({ id: generateId(), meridla: [], nemovitostId: "" }, r)); setShowForm(true); }, notify: notify }),
+            React.createElement("div", { style: { display: "flex", gap: "6px", marginLeft: "auto" } },
+                ["aktivni", "historicky", "vse"].map(f => React.createElement("button", { key: f, onClick: () => setFilter(f), style: { padding: "6px 14px", borderRadius: "20px", border: "1px solid", cursor: "pointer", fontSize: "12px", fontWeight: "600",
+                    borderColor: filter === f ? "#1a3a5c" : "#d1d5db",
+                    background: filter === f ? "#1a3a5c" : "#fff",
+                    color: filter === f ? "#fff" : "#374151" } },
+                    f === "aktivni" ? "✅ Aktivní" : f === "historicky" ? "📋 Historičtí" : "Všichni")))),
+
+        // List
+        filtered.length === 0 && React.createElement(Card, null,
+            React.createElement("p", { style: { textAlign: "center", color: "#9ca3af", padding: "40px 0" } },
+                filter === "aktivni" ? "Žádní aktivní nájemníci. Přidejte prvního." : "Žádní nájemníci v tomto filtru.")),
+
+        filtered.map(n => {
+            const nem = getNemovitost(n.nemovitostId);
+            const aktivni = isAktivni(n);
+            return React.createElement(Card, { key: n.id, style: { marginBottom: "12px", borderLeft: aktivni ? "4px solid #16a34a" : "4px solid #9ca3af", opacity: aktivni ? 1 : 0.8 } },
+                React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "8px" } },
+                    React.createElement("div", { style: { flex: 1 } },
+                        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" } },
+                            React.createElement("span", { style: { fontWeight: "700", fontSize: "16px" } }, n.jmeno),
+                            React.createElement("span", { style: { fontSize: "11px", padding: "2px 8px", borderRadius: "10px", fontWeight: "600",
+                                background: aktivni ? "#dcfce7" : "#f3f4f6", color: aktivni ? "#16a34a" : "#6b7280" } },
+                                aktivni ? "✅ Aktivní" : "📋 Historický")),
+                        React.createElement("div", { style: { fontSize: "12px", color: "#6b7280", lineHeight: "1.9" } },
+                            n.telefon && React.createElement("span", null, "📞 ", n.telefon, "  "),
+                            n.email && React.createElement("span", null, "📧 ", n.email),
+                            React.createElement("br", null),
+                            "Nástup: ", formatDate(n.datumNastupu),
+                            n.datumOdchodu && React.createElement("span", null, " | Odchod: ", formatDate(n.datumOdchodu)),
+                            React.createElement("br", null),
+                            "Nájem: ", React.createElement("strong", null, formatCZK(n.najem), "/měs"), " | Kauce: ", formatCZK(n.kauce),
+                            nem && React.createElement("span", null,
+                                React.createElement("br", null),
+                                "🏠 ",
+                                React.createElement("button", { onClick: () => setActiveTab("nemovitosti"), style: { background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: "12px", textDecoration: "underline", padding: 0 } },
+                                    nem.name, " — ", nem.address)))),
+                    React.createElement("div", { style: { display: "flex", gap: "4px", flexWrap: "wrap" } },
+                        React.createElement(Btn, { onClick: () => setShowMeridla(showMeridla === n.id ? null : n.id), variant: "secondary", small: true }, "🔢 Měřidla"),
+                        React.createElement(Btn, { onClick: () => { setEditN(n); setShowForm(true); }, variant: "secondary", small: true }, "✏️"),
+                        React.createElement(Btn, { onClick: () => del(n.id), variant: "danger", small: true }, "🗑"))),
+                showMeridla === n.id && React.createElement(MeridlaPanel, { najemnik: n, onSave: (m) => saveMeridla(n.id, m), notify: notify }));
+        }),
+
+        showForm && editN && React.createElement(Modal, { title: editN.jmeno || "Nový nájemník", onClose: () => setShowForm(false), wide: true },
+            React.createElement(NajemnikForm, { n: editN, onSave: save, onClose: () => setShowForm(false), properties: properties }))
+    );
+}
+
+
 function RDetail({ p, onBack, onEdit, onDelete, onUpdate, notify }) {
     const [tab, setTab] = (0, useState)("prehled");
     const [contractText, setContractText] = (0, useState)(null);
@@ -2206,6 +3235,7 @@ function RDetail({ p, onBack, onEdit, onDelete, onUpdate, notify }) {
         tab === "finance" && React.createElement(RTFinance, { p: p }),
         tab === "najem" && React.createElement(RTNajem, { p: p }),
         tab === "smlouva" && React.createElement(RTSmlouva, { p: p, onContract: genContract, onNotice: genNotice }),
+        tab === "najemnici" && React.createElement(RTNajemnici, { p: p, onUpdate: onUpdate, notify: notify }),
         tab === "hypoteka" && React.createElement(RTHypoteka, { p: p }),
         tab === "dokumenty" && React.createElement(RTDokumenty, { p: p, onUpdate: onUpdate, notify: notify }),
         tab === "poznamky" && (React.createElement(Card, null,
@@ -2398,7 +3428,13 @@ function RDashboard({ properties, onOpen, onAdd }) {
                                     background: histRok === y ? "#fffbeb" : "#fff",
                                     color: histRok === y ? "#d97706" : "#6b7280"
                                 } }, y)))))))))),
-                React.createElement(Btn, { onClick: onAdd }, "+ P\u0159idat"))),
+                React.createElement(Btn, { onClick: onAdd }, "+ P\u0159idat"),
+                    React.createElement(AIScanBtn, {
+                        label: "\uD83E\uDD16 Na\u010D\u00EDst ze smlouvy",
+                        prompt: "Z tohoto dokumentu (kupn\u00ED smlouva, n\u00E1jemn\u00ED smlouva, list vlastnictv\u00ED) extrahuj \u00FAdaje o nemovitosti. Vra\u0165 POUZE JSON: {\"name\": \"\", \"address\": \"\", \"type\": \"apartment\", \"size\": 0, \"purchasePrice\": 0, \"purchaseDate\": \"\", \"description\": \"\"}. Pro type pou\u017Eij: apartment/house/chata/land/commercial. Pokud \u00FAdaj nen\u00ED nalezen, nech pr\u00E1zdn\u00E9/0.",
+                        onResult: (result) => { onAdd(result); },
+                        notify: (msg) => console.log(msg)
+                    }))),
         !isCurrentYear && (React.createElement("div", { style: { background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: "10px",
                 padding: "10px 16px", marginBottom: "14px", fontSize: "12px", color: "#92400e", display: "flex",
                 justifyContent: "space-between", alignItems: "center" } },
@@ -2602,8 +3638,17 @@ function Nastaveni({ data, updateData, notify }) {
                 React.createElement("p", { style: { fontSize: "13px", color: "#6b7280", marginBottom: "12px", lineHeight: "1.6" } },
                     "Smaže všechny demo faktury, zákazníky, nemovitosti a majetek. Nastavení firmy zůstane zachováno. Tato akce je nevratná."),
                 React.createElement(ConfirmDialog2Btn, {
-                    label: "\uD83D\uDDD1\uFE0F Vymazat testovací data",
-                    message: "Opravdu smazat všechna testovací data? Nastavení firmy zůstane.",
+                    label: "\uD83C\uDF89 Na\u010D\u00EDst uk\u00E1zkov\u00E1 data",
+                    message: "Nahradit aktu\u00E1ln\u00ED data uk\u00E1zkov\u00FDmi? Sou\u010Dasn\u00E1 data budou p\u0159eps\u00E1na.",
+                    onConfirm: () => {
+                        updateData(() => Object.assign({}, sampleData));
+                        notify("\u2705 Uk\u00E1zkov\u00E1 data na\u010Dtena!");
+                    }
+                }),
+                React.createElement("div", { style: { marginTop: "8px" } }),
+                React.createElement(ConfirmDialog2Btn, {
+                    label: "\uD83D\uDDD1\uFE0F Vymazat v\u0161echna data",
+                    message: "Opravdu smazat v\u0161echna data? Nastaven\u00ED firmy z\u016Fstane.",
                     onConfirm: () => {
                         updateData(prev => ({
                             ...prev,
@@ -2611,9 +3656,12 @@ function Nastaveni({ data, updateData, notify }) {
                             zakaznici: [],
                             majetek: [],
                             danNaklady: {},
+                            prijateFaktury: [],
+                            dodavatele: [],
+                            najemnici: [],
                             nemovitosti: { properties: [] },
                         }));
-                        notify("\u2705 Testovací data smazána!");
+                        notify("\u2705 Data smazána!");
                     }
                 })),
             React.createElement(Card, { style: { background: "#f0fdf4", border: "1px solid #86efac" } },
