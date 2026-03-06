@@ -624,25 +624,36 @@ function GoogleDriveBtn({ data, updateData, notify }) {
             }
         });
     };
-    const syncNow = async () => {
+    const syncNow = async (silent = false) => {
+        if (status === "loading") return;
         setStatus("loading");
         try {
             await saveToDrive(data);
-            // Pokus o týdenní zálohu
             const backupName = await createWeeklyBackupIfNeeded(data);
             setLastSync(new Date().toLocaleTimeString("cs-CZ"));
             setStatus("connected");
-            if (backupName) {
-                notify("✅ Uloženo + vytvořena týdenní záloha!");
-            } else {
-                notify("✅ Uloženo na Google Drive");
+            if (!silent) {
+                if (backupName) {
+                    notify("✅ Uloženo + vytvořena týdenní záloha!");
+                } else {
+                    notify("✅ Uloženo na Google Drive");
+                }
             }
         }
         catch (e) {
             setStatus("error");
-            notify("Chyba sync: " + e.message);
+            if (!silent) notify("Chyba sync: " + e.message);
         }
     };
+
+    // Auto-save každých 30 sekund pokud je připojeno
+    (0, useEffect)(() => {
+        if (status !== "connected") return;
+        const interval = setInterval(() => {
+            syncNow(true); // silent = bez notifikace
+        }, 30000);
+        return () => clearInterval(interval);
+    }, [status, data]);
     if (status === "noClientId") {
         return (React.createElement("div", { style: { background: "rgba(251,191,36,0.15)", border: "1px solid rgba(251,191,36,0.4)",
                 borderRadius: "8px", padding: "8px 10px", fontSize: "10px", color: "#fbbf24", lineHeight: "1.5" } },
@@ -661,6 +672,8 @@ function GoogleDriveBtn({ data, updateData, notify }) {
                     fontSize: "11px", cursor: "pointer", fontWeight: "600", textAlign: "center" } },
                 "\u2705 Drive synced ",
                 lastSync && `· ${lastSync}`),
+            React.createElement("div", { style: { fontSize: "10px", color: "#6ee7b7", textAlign: "center", marginTop: "2px" } },
+                "\u23F1\uFE0F Auto-ukládání každých 30s"),
             React.createElement("div", { style: { fontSize: "10px", color: "#94a3b8", textAlign: "center" } },
                 alreadyBacked
                     ? `\uD83D\uDCE6 Záloha týden ${weekNum}/${year} ✓`
