@@ -728,18 +728,19 @@ const stavBadge = (stav) => {
 const GDRIVE_CLIENT_ID = "1032917712894-ccd3c0ttmm313dvbrg1fbih7jifob6ej.apps.googleusercontent.com";
 
 // ── Gemini AI ────────────────────────────────────────────────
-// ⚠️  GEMINI API KLÍČ — VLOŽ SEM NOVÝ KLÍČ (starý byl zneplatněn)
-// Návod: console.cloud.google.com/apis/credentials → Create API Key
-// Omez klíč na: Generative Language API + HTTP referrer: tvoje-domena.github.io/*
-const GEMINI_API_KEY = "AIzaSyC_u7sIKZrm1O8EaLVHSvax2eYWKeOSECM";
-const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=" + GEMINI_API_KEY;
+// Gemini API klíč se načítá z localStorage (nastavení v aplikaci)
+// Klíč NENÍ uložen v kódu — zadej ho v záložce Nastavení
+const getGeminiKey = () => { try { return localStorage.getItem("gemini_api_key") || ""; } catch(e) { return ""; } };
+const GEMINI_URL = (key) => "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=" + key;
 
 async function callGemini(prompt, imageBase64, mimeType) {
+    const key = getGeminiKey();
+    if (!key) throw new Error("Gemini API klíč není nastaven. Přejdi do Nastavení a zadej svůj klíč.");
     const parts = [{ text: prompt }];
     if (imageBase64) {
         parts.push({ inline_data: { mime_type: mimeType || "image/jpeg", data: imageBase64 } });
     }
-    const resp = await fetch(GEMINI_URL, {
+    const resp = await fetch(GEMINI_URL(key), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contents: [{ parts }] })
@@ -836,6 +837,71 @@ async function loadFromDrive() {
         fileId, alt: "media",
     });
     return JSON.parse(resp.body);
+}
+
+// ── Gemini API klíč z Google Drive ──────────────────────────
+const GEMINI_KEY_FILE = "gemini_key.txt";
+
+async function loadGeminiKeyFromDrive() {
+    try {
+        const token = window.gapi.client.getToken().access_token;
+        const resp = await fetch(
+            `https://www.googleapis.com/drive/v3/files?q=name='${GEMINI_KEY_FILE}' and trashed=false&spaces=drive&fields=files(id,name)`,
+            { headers: { "Authorization": "Bearer " + token } }
+        );
+        const data = await resp.json();
+        if (!data.files || data.files.length === 0) return null;
+        const fileId = data.files[0].id;
+        const content = await fetch(
+            `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+            { headers: { "Authorization": "Bearer " + token } }
+        );
+        const key = (await content.text()).trim();
+        if (key && key.startsWith("AIzaSy")) {
+            try { localStorage.setItem("gemini_api_key", key); } catch(e) {}
+            return key;
+        }
+        return null;
+    } catch(e) {
+        console.log("Gemini key load from Drive failed:", e);
+        return null;
+    }
+}
+
+async function saveGeminiKeyToDrive(key) {
+    try {
+        const token = window.gapi.client.getToken().access_token;
+        const blob = new Blob([key], { type: "text/plain" });
+        // Zkontroluj jestli soubor existuje
+        const resp = await fetch(
+            `https://www.googleapis.com/drive/v3/files?q=name='${GEMINI_KEY_FILE}' and trashed=false&spaces=drive&fields=files(id)`,
+            { headers: { "Authorization": "Bearer " + token } }
+        );
+        const data = await resp.json();
+        if (data.files && data.files.length > 0) {
+            // Aktualizuj existující
+            await fetch(`https://www.googleapis.com/upload/drive/v3/files/${data.files[0].id}?uploadType=media`, {
+                method: "PATCH",
+                headers: { "Authorization": "Bearer " + token, "Content-Type": "text/plain" },
+                body: key,
+            });
+        } else {
+            // Vytvoř nový
+            const meta = { name: GEMINI_KEY_FILE, mimeType: "text/plain" };
+            const form = new FormData();
+            form.append("metadata", new Blob([JSON.stringify(meta)], { type: "application/json" }));
+            form.append("file", blob);
+            await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
+                method: "POST",
+                headers: { "Authorization": "Bearer " + token },
+                body: form,
+            });
+        }
+        return true;
+    } catch(e) {
+        console.log("Gemini key save to Drive failed:", e);
+        return false;
+    }
 }
 
 // ── Týdenní zálohy ──────────────────────────────────────────
@@ -938,6 +1004,9 @@ function MobileDriveBtn({ data, updateData, notify }) {
                                 const driveData = await loadFromDrive();
                                 if (driveData) { updateData(driveData); notify("✅ Data načtena z Drive!"); }
                                 else { await saveToDrive(data); notify("✅ Uloženo na Drive!"); }
+                                // Načíst Gemini klíč z Drive
+                                const gKey = await loadGeminiKeyFromDrive();
+                                if (gKey) notify("🤖 Gemini API klíč načten z Drive!");
                                 tokenClient = tc;
                                 setStatus("connected");
                             } catch(e) { setStatus("error"); }
@@ -1013,6 +1082,9 @@ function GoogleDriveBtn({ data, updateData, notify }) {
                                     await saveToDrive(data);
                                     notify("✅ Data uložena na Google Drive!");
                                 }
+                                // Načíst Gemini klíč z Drive
+                                const gKey = await loadGeminiKeyFromDrive();
+                                if (gKey) notify("🤖 Gemini API klíč načten z Drive!");
                                 // Týdenní záloha při připojení
                                 await createWeeklyBackupIfNeeded(data);
                                 setStatus("connected");
@@ -3588,9 +3660,22 @@ function ConfirmDialog2Btn({ label, message, onConfirm }) {
 
 function Nastaveni({ data, updateData, notify }) {
     const [firma, setFirma] = (0, useState)(data.firma);
+    const [geminiKey, setGeminiKey] = (0, useState)(() => { try { return localStorage.getItem("gemini_api_key") || ""; } catch(e) { return ""; } });
+    const [showKey, setShowKey] = (0, useState)(false);
     const save = () => {
         updateData(prev => (Object.assign(Object.assign({}, prev), { firma })));
         notify("Nastavení uloženo!");
+    };
+    const saveGeminiKey = async () => {
+        const key = geminiKey.trim();
+        try { localStorage.setItem("gemini_api_key", key); } catch(e) {}
+        // Uložit také na Drive pokud je připojeno
+        if (window.gapi && window.gapi.client.getToken && window.gapi.client.getToken()) {
+            const ok = await saveGeminiKeyToDrive(key);
+            notify(ok ? "\u2705 Kl\u00ED\u010D ulo\u017Een (lok\u00E1ln\u011B + Drive)" : "\u2705 Kl\u00ED\u010D ulo\u017Een lok\u00E1ln\u011B");
+        } else {
+            notify("\u2705 Kl\u00ED\u010D ulo\u017Een lok\u00E1ln\u011B (p\u0159ipoj Drive pro z\u00E1lohu)");
+        }
     };
     const set = (k, v) => setFirma(p => (Object.assign(Object.assign({}, p), { [k]: v })));
     return (React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" } },
@@ -3612,6 +3697,25 @@ function Nastaveni({ data, updateData, notify }) {
             React.createElement("div", { style: { display: "flex", gap: "12px", marginTop: "4px" } },
                 React.createElement(Btn, { onClick: save }, "\uD83D\uDCBE Ulo\u017Eit nastaven\u00ED"))),
         React.createElement("div", null,
+            React.createElement(Card, { style: { marginBottom: "16px", background: "#f0fdf4", border: "1px solid #86efac" } },
+                React.createElement("h3", { style: { marginTop: 0, color: "#15803d" } }, "\uD83E\uDD16 Gemini AI \u2014 API kl\u00ED\u010D"),
+                React.createElement("p", { style: { fontSize: "13px", color: "#374151", marginBottom: "12px", lineHeight: "1.6" } },
+                    "Kl\u00ED\u010D se ukl\u00E1d\u00E1 pouze v prohl\u00ED\u017Ee\u010Di (localStorage) \u2014 ",
+                    React.createElement("strong", null, "nikdy se nenahraje na GitHub.")),
+                React.createElement("div", { style: { display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" } },
+                    React.createElement("input", {
+                        type: showKey ? "text" : "password",
+                        value: geminiKey,
+                        onChange: e => setGeminiKey(e.target.value),
+                        placeholder: "AIzaSy...",
+                        style: { flex: 1, padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px", fontFamily: "monospace" }
+                    }),
+                    React.createElement("button", { onClick: () => setShowKey(s => !s),
+                        style: { padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", background: "#fff", cursor: "pointer", fontSize: "14px" } },
+                        showKey ? "\uD83D\uDE48" : "\uD83D\uDC41\uFE0F")),
+                React.createElement("div", { style: { display: "flex", gap: "8px", alignItems: "center" } },
+                    React.createElement(Btn, { onClick: saveGeminiKey }, "\uD83D\uDCBE Ulo\u017Eit kl\u00ED\u010D"),
+                    geminiKey && React.createElement("span", { style: { fontSize: "12px", color: "#16a34a", fontWeight: "600" } }, "\u2705 Kl\u00ED\u010D nastaven"))),
             React.createElement(Card, { style: { marginBottom: "16px" } },
                 React.createElement("h3", { style: { marginTop: 0, color: "#1a3a5c" } }, "\u2601\uFE0F Ukl\u00E1d\u00E1n\u00ED a z\u00E1lohy"),
                 React.createElement("div", { style: { fontSize: "13px", lineHeight: "1.8", color: "#374151" } },
