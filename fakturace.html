@@ -728,7 +728,10 @@ const stavBadge = (stav) => {
 const GDRIVE_CLIENT_ID = "1032917712894-ccd3c0ttmm313dvbrg1fbih7jifob6ej.apps.googleusercontent.com";
 
 // ── Gemini AI ────────────────────────────────────────────────
-const GEMINI_API_KEY = "AIzaSyDHkVvQxbW5bVDVyLGLpDL2XcTOZ88NVLo";
+// ⚠️  GEMINI API KLÍČ — VLOŽ SEM NOVÝ KLÍČ (starý byl zneplatněn)
+// Návod: console.cloud.google.com/apis/credentials → Create API Key
+// Omez klíč na: Generative Language API + HTTP referrer: tvoje-domena.github.io/*
+const GEMINI_API_KEY = "AIzaSyC_u7sIKZrm1O8EaLVHSvax2eYWKeOSECM";
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=" + GEMINI_API_KEY;
 
 async function callGemini(prompt, imageBase64, mimeType) {
