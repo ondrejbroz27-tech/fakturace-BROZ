@@ -2093,17 +2093,24 @@ function roundXml(n) {
 // Daňové přiznání k DPH — dle vzoru EPO DPHDP3
 function generateDPXml(data, rok, kvartal, hlaseni, prijateDphOdpocet, prijateFaktury) {
     const firma = data.firma || {};
-    const dic = (firma.dic || "").replace(/\s/g, "");
+    // DIČ — pouze číselná část bez prefixu CZ
+    const dicRaw = (firma.dic || "").replace(/\s/g, "").replace(/^CZ/i, "");
+    // VetaP.dic — vzor [0-9]{1,10}
+    const dicCislo = dicRaw.replace(/[^0-9]/g, "");
+
     const mesice = kvartal === 1 ? [1,2,3] : kvartal === 2 ? [4,5,6] : kvartal === 3 ? [7,8,9] : [10,11,12];
-    const datumPodani = new Date().toISOString().split("T")[0];
+
+    // Formát datumu DD.MM.RRRR dle XSD dateInMultiFormat
+    const fmtDate = (d) => padNum(d.getDate(),2) + "." + padNum(d.getMonth()+1,2) + "." + d.getFullYear();
+    const dnes = fmtDate(new Date());
 
     // Základ a DPH na výstupu
     const r01z = Math.round(hlaseni.zaklad21);
     const r01d = Math.round(hlaseni.dph21);
     const r02z = Math.round(hlaseni.zaklad12);
     const r02d = Math.round(hlaseni.dph12);
-    // Základ osvobozených plnění (ř. 50)
-    const r50 = Math.round(hlaseni.zaklad0);
+    // Základ osvobozených plnění
+    const r46val = Math.round(hlaseni.zaklad0);
     // DPH na vstupu (odpočet)
     const prijate21 = prijateFaktury.filter(f => (f.sazba||21) === 21);
     const prijate12 = prijateFaktury.filter(f => (f.sazba||21) === 12);
@@ -2118,65 +2125,38 @@ function generateDPXml(data, rok, kvartal, hlaseni, prijateDphOdpocet, prijateFa
     const vlastniPovinn = Math.max(0, danRozdil);
     const nadmernyOdpocet = Math.max(0, -danRozdil);
 
-    // Datum konce zdaňovacího období
-    const posledniMesic = mesice[mesice.length - 1];
-    const posledniDenDatum = new Date(rok, posledniMesic, 0);
-    const datumDo = posledniDenDatum.getFullYear() + "-" + padNum(posledniDenDatum.getMonth()+1, 2) + "-" + padNum(posledniDenDatum.getDate(), 2);
-    const datumOd = rok + "-" + padNum(mesice[0], 2) + "-01";
+    const nazev = (firma.nazev||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").substring(0,255);
 
     return `<?xml version="1.0" encoding="UTF-8"?>
 <Pisemnost nazevSW="FakturaceBROZ" verzeSW="1.0">
-  <DPHDP3 verzePis="01.02">
+  <DPHDP3>
     <VetaD
-      d_poddp="${datumPodani}"
-      dic="${dic}"
-      typ_platce="kvartal"
-      zdobd_od="${datumOd}"
-      zdobd_do="${datumDo}"
-      mesic="${posledniMesic}"
+      d_poddp="${dnes}"
+      typ_platce="P"
+      ctvrt="${kvartal}"
       rok="${rok}"
-      trans="A"
+      dapdph_forma="B"
       dokument="DP3"
-      khdph="N"
+      k_uladis="DPH"
+      trans="A"
     />
     <VetaP
-      c_ufo_cds=""
-      dic="${dic}"
-      jmeno="${(firma.nazev||"").replace(/&/g,"&amp;").replace(/</g,"&lt;")}"
-      stat="CZ"
+      c_ufo="1"
+      dic="${dicCislo}"
+      zkrobchjm="${nazev}"
+      typ_ds="F"
     />
-    <VetaR
-      r01="${roundXml(r01z)}" r01d="${roundXml(r01d)}"
-      r02="${roundXml(r02z)}" r02d="${roundXml(r02d)}"
-      r10="0" r10d="0"
-      r11="0" r11d="0"
-      r26="0"
-      r30="0" r30d="0"
-      r31="0" r31d="0"
-      r32="0"
-      r33="0"
-      r34="0"
-      r40="${roundXml(r40z)}" r40d="${roundXml(r40d)}"
-      r41="${roundXml(r41z)}" r41d="${roundXml(r41d)}"
-      r42="0" r42d="0"
-      r43="0" r43d="0"
-      r44="0" r44d="0"
-      r45="0"
-      r46="${roundXml(r50)}"
-      r47="0"
-      r50="${roundXml(r40d + r41d)}"
-      r51="0"
-      r52="0"
-      r53="${roundXml(r40d + r41d)}"
-      r60="0"
-      r61="0"
-      r62="${roundXml(danVystup)}"
-      r63="${roundXml(danVstup)}"
-      r64="${roundXml(danRozdil)}"
-      r65="0"
-      r66="0"
-      r71="${roundXml(vlastniPovinn)}"
-      r72="${roundXml(nadmernyOdpocet)}"
+    <Veta1
+      obrat23="${roundXml(r01z)}"
+      dan23="${roundXml(r01d)}"
+      obrat5="${roundXml(r02z)}"
+      dan5="${roundXml(r02d)}"
+    />
+    <Veta4
+      od_zdp23="${roundXml(r40z)}"
+      nar_zdp23="${roundXml(r40d)}"
+      od_zdp5="${roundXml(r41z)}"
+      nar_zdp5="${roundXml(r41d)}"
     />
   </DPHDP3>
 </Pisemnost>`;
@@ -2185,13 +2165,11 @@ function generateDPXml(data, rok, kvartal, hlaseni, prijateDphOdpocet, prijateFa
 // Kontrolní hlášení DPH — dle schématu DPHKH1
 function generateKHXml(data, rok, kvartal, hlaseni, prijateFaktury) {
     const firma = data.firma || {};
-    const dic = (firma.dic || "").replace(/\s/g, "");
-    const mesice = kvartal === 1 ? [1,2,3] : kvartal === 2 ? [4,5,6] : kvartal === 3 ? [7,8,9] : [10,11,12];
-    const datumPodani = new Date().toISOString().split("T")[0];
-    const posledniMesic = mesice[mesice.length - 1];
-    const datumDo = new Date(rok, posledniMesic, 0);
-    const datumDoStr = datumDo.getFullYear() + "-" + padNum(datumDo.getMonth()+1, 2) + "-" + padNum(datumDo.getDate(), 2);
-    const datumOdStr = rok + "-" + padNum(mesice[0], 2) + "-01";
+    const dicRaw = (firma.dic || "").replace(/\s/g, "").replace(/^CZ/i, "");
+    const dicCislo = dicRaw.replace(/[^0-9]/g, "");
+    const fmtDate = (d) => padNum(d.getDate(),2) + "." + padNum(d.getMonth()+1,2) + "." + d.getFullYear();
+    const dnes = fmtDate(new Date());
+    const nazev = (firma.nazev||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").substring(0,255);
 
     // A4 — vydané faktury nad 10 000 Kč základ (sekce A4 = přijatá zdanitelná plnění od plátců)
     // A5 — vydané faktury do 10 000 Kč (souhrnný řádek)
@@ -2243,22 +2221,21 @@ function generateKHXml(data, rok, kvartal, hlaseni, prijateFaktury) {
 
     return `<?xml version="1.0" encoding="UTF-8"?>
 <Pisemnost nazevSW="FakturaceBROZ" verzeSW="1.0">
-  <DPHKH1 verzePis="01.02">
+  <DPHKH1>
     <VetaD
-      d_poddp="${datumPodani}"
-      dic="${dic}"
-      typ_platce="kvartal"
-      zdobd_od="${datumOdStr}"
-      zdobd_do="${datumDoStr}"
-      mesic="${posledniMesic}"
+      d_poddp="${dnes}"
+      typ_platce="P"
+      kvartal="${kvartal}"
       rok="${rok}"
-      trans="A"
       dokument="KH1"
+      k_uladis="DPH"
+      khdph_forma="B"
     />
     <VetaP
-      dic="${dic}"
-      jmeno="${(firma.nazev||"").replace(/&/g,"&amp;").replace(/</g,"&lt;")}"
-      stat="CZ"
+      dic="${dicCislo}"
+      zkrobchjm="${nazev}"
+      typ_ds="F"
+      c_ufo="1"
     />
     <Sekce_A>
 ${a4Rows}
