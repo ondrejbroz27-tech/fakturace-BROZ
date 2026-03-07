@@ -185,7 +185,7 @@ const loadData = () => {
         if (raw) {
             const saved = JSON.parse(raw);
             const migratedFaktury = migrateFaktury(saved.faktury);
-            return Object.assign(Object.assign(Object.assign({}, initialState), saved), { firma: saved.firma || initialState.firma, zakaznici: saved.zakaznici || [], faktury: migratedFaktury || [], danNaklady: saved.danNaklady || {}, prijateFaktury: saved.prijateFaktury || [], dodavatele: saved.dodavatele || [], metodaVydaju: saved.metodaVydaju || "pausal", metoda9: saved.metoda9 || "pausal30", najemnici: saved.najemnici || [], nemovitosti: {
+            return Object.assign(Object.assign(Object.assign({}, initialState), saved), { firma: Object.assign({}, initialState.firma, saved.firma || {}), zakaznici: saved.zakaznici || [], faktury: migratedFaktury || [], danNaklady: saved.danNaklady || {}, prijateFaktury: saved.prijateFaktury || [], dodavatele: saved.dodavatele || [], metodaVydaju: saved.metodaVydaju || "pausal", metoda9: saved.metoda9 || "pausal30", najemnici: saved.najemnici || [], nemovitosti: {
                     properties: (saved.nemovitosti && saved.nemovitosti.properties && saved.nemovitosti.properties.length)
                         ? saved.nemovitosti.properties
                         : initialState.nemovitosti.properties,
@@ -635,11 +635,9 @@ const generateInvoiceHTML = (faktura, firma, zakaznik) => {
   <p>Variabilní symbol: ${faktura.variabilniSymbol || ((_a = faktura.cislo) === null || _a === void 0 ? void 0 : _a.replace(/\D/g, ""))}</p>
   ${faktura.poznamka ? `<p>Poznámka: ${faktura.poznamka}</p>` : ""}
   <div style="border:1px solid #f59e0b;background:#fffbeb;border-radius:4px;padding:8px 12px;margin-top:12px;font-size:11px;color:#92400e">
-    Pro účely kontrolního hlášení v ČR uvádějte VS a č. faktury ve formátu pouze v číselném formátu bez písmen.
+    Pro účely kontrolního hlášení v ČR uvádějte VS a č. faktury pouze v číselném formátu bez písmen.
   </div>
-  ${(firma.zivnostEvidCislo||firma.zivnostCj) ? `<div style="margin-top:10px;font-size:11px;color:#374151;border-top:1px solid #e5e7eb;padding-top:8px">
-    Ev.č.ŽL ${firma.zivnostEvidCislo||""}, č.j.: ${firma.zivnostCj||""}, vydal ${firma.zivnostVydal||""} ${firma.zivnostDatum||""}
-  </div>` : ""}
+  ${(() => { const zl = [firma.zivnostEvidCislo ? "Ev.č.ŽL " + firma.zivnostEvidCislo : "", firma.zivnostCj ? "č.j.: " + firma.zivnostCj : "", firma.zivnostVydal ? "vydal " + firma.zivnostVydal : "", firma.zivnostDatum || ""].filter(Boolean).join(", "); return zl ? `<div style="margin-top:10px;font-size:11px;color:#374151;border-top:1px solid #e5e7eb;padding-top:8px">${zl}</div>` : ""; })()}
 </div>
 ${(firma.banka && (faktura.zpusobPlatby || "Převodem") === "Převodem") ? (() => {
   const vs = faktura.variabilniSymbol || (faktura.cislo || "").replace(/\D/g,"");
