@@ -89,6 +89,7 @@ const initialState = {
         telefon: "",
         platceDPH: false,
         splatnost: 14,
+        c_ufo: "",
     },
     zakaznici: [],
     faktury: [],
@@ -2093,37 +2094,27 @@ function roundXml(n) {
 // Daňové přiznání k DPH — dle vzoru EPO DPHDP3
 function generateDPXml(data, rok, kvartal, hlaseni, prijateDphOdpocet, prijateFaktury) {
     const firma = data.firma || {};
-    // DIČ — pouze číselná část bez prefixu CZ
-    const dicRaw = (firma.dic || "").replace(/\s/g, "").replace(/^CZ/i, "");
-    // VetaP.dic — vzor [0-9]{1,10}
-    const dicCislo = dicRaw.replace(/[^0-9]/g, "");
-
-    const mesice = kvartal === 1 ? [1,2,3] : kvartal === 2 ? [4,5,6] : kvartal === 3 ? [7,8,9] : [10,11,12];
-
+    // DIČ — pouze číselná část bez prefixu CZ (vzor [0-9]{1,10})
+    const dicCislo = (firma.dic || "").replace(/\s/g,"").replace(/^CZ/i,"").replace(/[^0-9]/g,"");
+    const cufo = (firma.c_ufo || "1").replace(/[^0-9]/g,"") || "1";
     // Formát datumu DD.MM.RRRR dle XSD dateInMultiFormat
-    const fmtDate = (d) => padNum(d.getDate(),2) + "." + padNum(d.getMonth()+1,2) + "." + d.getFullYear();
+    const fmtDate = (d) => padNum(d.getDate(),2)+"."+padNum(d.getMonth()+1,2)+"."+d.getFullYear();
     const dnes = fmtDate(new Date());
 
-    // Základ a DPH na výstupu
-    const r01z = Math.round(hlaseni.zaklad21);
-    const r01d = Math.round(hlaseni.dph21);
-    const r02z = Math.round(hlaseni.zaklad12);
-    const r02d = Math.round(hlaseni.dph12);
-    // Základ osvobozených plnění
-    const r46val = Math.round(hlaseni.zaklad0);
-    // DPH na vstupu (odpočet)
+    // Výstup — uskutečněná zdanitelná plnění (ř.1 = 21%, ř.2 = 12%)
+    const obrat23 = Math.round(hlaseni.zaklad21);
+    const dan23   = Math.round(hlaseni.dph21);
+    const obrat5  = Math.round(hlaseni.zaklad12);
+    const dan5    = Math.round(hlaseni.dph12);
+
+    // Vstup — přijatá zdanitelná plnění (ř.40 = 21%, ř.41 = 12%)
+    // od_zdp = základ, nar_zdp = nárok na odpočet (DPH)
     const prijate21 = prijateFaktury.filter(f => (f.sazba||21) === 21);
     const prijate12 = prijateFaktury.filter(f => (f.sazba||21) === 12);
-    const r40z = Math.round(prijate21.reduce((s,f) => s + (f.castka||0), 0));
-    const r40d = Math.round(prijate21.reduce((s,f) => s + (f.dph||0), 0));
-    const r41z = Math.round(prijate12.reduce((s,f) => s + (f.castka||0), 0));
-    const r41d = Math.round(prijate12.reduce((s,f) => s + (f.dph||0), 0));
-    // Celky
-    const danVystup = r01d + r02d;
-    const danVstup = r40d + r41d;
-    const danRozdil = danVystup - danVstup;
-    const vlastniPovinn = Math.max(0, danRozdil);
-    const nadmernyOdpocet = Math.max(0, -danRozdil);
+    const od_zdp23  = Math.round(prijate21.reduce((s,f) => s+(f.castka||0), 0));
+    const nar_zdp23 = Math.round(prijate21.reduce((s,f) => s+(f.dph||0), 0));
+    const od_zdp5   = Math.round(prijate12.reduce((s,f) => s+(f.castka||0), 0));
+    const nar_zdp5  = Math.round(prijate12.reduce((s,f) => s+(f.dph||0), 0));
 
     const nazev = (firma.nazev||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").substring(0,255);
 
@@ -2132,31 +2123,30 @@ function generateDPXml(data, rok, kvartal, hlaseni, prijateDphOdpocet, prijateFa
   <DPHDP3>
     <VetaD
       d_poddp="${dnes}"
-      typ_platce="P"
       ctvrt="${kvartal}"
       rok="${rok}"
+      typ_platce="P"
       dapdph_forma="B"
       dokument="DP3"
       k_uladis="DPH"
-      trans="A"
     />
     <VetaP
-      c_ufo="1"
+      c_ufo="${cufo}"
       dic="${dicCislo}"
       zkrobchjm="${nazev}"
       typ_ds="F"
     />
     <Veta1
-      obrat23="${roundXml(r01z)}"
-      dan23="${roundXml(r01d)}"
-      obrat5="${roundXml(r02z)}"
-      dan5="${roundXml(r02d)}"
+      obrat23="${roundXml(obrat23)}"
+      dan23="${roundXml(dan23)}"
+      obrat5="${roundXml(obrat5)}"
+      dan5="${roundXml(dan5)}"
     />
     <Veta4
-      od_zdp23="${roundXml(r40z)}"
-      nar_zdp23="${roundXml(r40d)}"
-      od_zdp5="${roundXml(r41z)}"
-      nar_zdp5="${roundXml(r41d)}"
+      od_zdp23="${roundXml(od_zdp23)}"
+      nar_zdp23="${roundXml(nar_zdp23)}"
+      od_zdp5="${roundXml(od_zdp5)}"
+      nar_zdp5="${roundXml(nar_zdp5)}"
     />
   </DPHDP3>
 </Pisemnost>`;
@@ -2165,58 +2155,67 @@ function generateDPXml(data, rok, kvartal, hlaseni, prijateDphOdpocet, prijateFa
 // Kontrolní hlášení DPH — dle schématu DPHKH1
 function generateKHXml(data, rok, kvartal, hlaseni, prijateFaktury) {
     const firma = data.firma || {};
-    const dicRaw = (firma.dic || "").replace(/\s/g, "").replace(/^CZ/i, "");
-    const dicCislo = dicRaw.replace(/[^0-9]/g, "");
-    const fmtDate = (d) => padNum(d.getDate(),2) + "." + padNum(d.getMonth()+1,2) + "." + d.getFullYear();
-    const dnes = fmtDate(new Date());
+    const dicCislo = (firma.dic || "").replace(/\s/g,"").replace(/^CZ/i,"").replace(/[^0-9]/g,"");
+    const cufo = (firma.c_ufo || "1").replace(/[^0-9]/g,"") || "1";
     const nazev = (firma.nazev||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").substring(0,255);
+    // Formát datumu DD.MM.RRRR
+    const fmtDate = (d) => padNum(d.getDate(),2)+"."+padNum(d.getMonth()+1,2)+"."+d.getFullYear();
+    const dnes = fmtDate(new Date());
 
-    // A4 — vydané faktury nad 10 000 Kč základ (sekce A4 = přijatá zdanitelná plnění od plátců)
-    // A5 — vydané faktury do 10 000 Kč (souhrnný řádek)
+    // Helper: z DIČ "CZ12345678" nebo "12345678" → jen číslice
+    const dicNum = (dic) => (dic||"").replace(/\s/g,"").replace(/^CZ/i,"").replace(/[^0-9]/g,"");
+    // Helper: z čísla faktury vyextrahuj číselnout část pro c_evid_dd (max 60 znaků)
+    const evCislo = (cislo) => (cislo||"").replace(/[^0-9A-Za-z\-\/]/g,"").substring(0,60) || "0";
+
+    // A4 — vydané faktury nad 10 000 Kč základ (§ 100 odst. 1 DPH)
     const vydaneFaktury = hlaseni.faktury;
     const a4Faktury = vydaneFaktury.filter(f => {
-        const t = calcFakturaTotal(f.polozky || []);
+        const t = calcFakturaTotal(f.polozky||[]);
         return t.zaklad >= 10000;
     });
     const a5Faktury = vydaneFaktury.filter(f => {
-        const t = calcFakturaTotal(f.polozky || []);
+        const t = calcFakturaTotal(f.polozky||[]);
         return t.zaklad < 10000;
     });
 
     // A5 souhrnné hodnoty
-    const a5zaklad21 = Math.round(a5Faktury.reduce((s,f) => { const t = calcFakturaTotal(f.polozky||[]); return s + ((t.groups[21]||{}).zaklad||0); }, 0));
-    const a5dph21 = Math.round(a5Faktury.reduce((s,f) => { const t = calcFakturaTotal(f.polozky||[]); return s + ((t.groups[21]||{}).dph||0); }, 0));
-    const a5zaklad12 = Math.round(a5Faktury.reduce((s,f) => { const t = calcFakturaTotal(f.polozky||[]); return s + ((t.groups[12]||{}).zaklad||0); }, 0));
-    const a5dph12 = Math.round(a5Faktury.reduce((s,f) => { const t = calcFakturaTotal(f.polozky||[]); return s + ((t.groups[12]||{}).dph||0); }, 0));
+    const a5z1 = a5Faktury.reduce((s,f)=>{ const t=calcFakturaTotal(f.polozky||[]); return s+((t.groups[21]||{}).zaklad||0); },0);
+    const a5d1 = a5Faktury.reduce((s,f)=>{ const t=calcFakturaTotal(f.polozky||[]); return s+((t.groups[21]||{}).dph||0); },0);
+    const a5z2 = a5Faktury.reduce((s,f)=>{ const t=calcFakturaTotal(f.polozky||[]); return s+((t.groups[12]||{}).zaklad||0); },0);
+    const a5d2 = a5Faktury.reduce((s,f)=>{ const t=calcFakturaTotal(f.polozky||[]); return s+((t.groups[12]||{}).dph||0); },0);
 
     // B2 — přijaté faktury nad 10 000 Kč základ
-    // B3 — přijaté faktury do 10 000 Kč (souhrnný)
-    const prijate = prijateFaktury;
-    const b2Faktury = prijate.filter(f => (f.castka||0) >= 10000);
-    const b3Faktury = prijate.filter(f => (f.castka||0) < 10000);
-    const b3zaklad21 = Math.round(b3Faktury.filter(f=>(f.sazba||21)===21).reduce((s,f)=>s+(f.castka||0),0));
-    const b3dph21 = Math.round(b3Faktury.filter(f=>(f.sazba||21)===21).reduce((s,f)=>s+(f.dph||0),0));
-    const b3zaklad12 = Math.round(b3Faktury.filter(f=>(f.sazba||21)===12).reduce((s,f)=>s+(f.castka||0),0));
-    const b3dph12 = Math.round(b3Faktury.filter(f=>(f.sazba||21)===12).reduce((s,f)=>s+(f.dph||0),0));
+    const b2Faktury = prijateFaktury.filter(f => (f.castka||0) >= 10000);
+    const b3Faktury = prijateFaktury.filter(f => (f.castka||0) < 10000);
+    const b3z1 = Math.round(b3Faktury.filter(f=>(f.sazba||21)===21).reduce((s,f)=>s+(f.castka||0),0));
+    const b3d1 = Math.round(b3Faktury.filter(f=>(f.sazba||21)===21).reduce((s,f)=>s+(f.dph||0),0));
+    const b3z2 = Math.round(b3Faktury.filter(f=>(f.sazba||21)===12).reduce((s,f)=>s+(f.castka||0),0));
+    const b3d2 = Math.round(b3Faktury.filter(f=>(f.sazba||21)===12).reduce((s,f)=>s+(f.dph||0),0));
 
+    // Generuj řádky A4 — každá faktura zvlášť
     const a4Rows = a4Faktury.map((f, i) => {
-        const t = calcFakturaTotal(f.polozky || []);
-        const g21 = t.groups[21] || { zaklad: 0, dph: 0 };
-        const g12 = t.groups[12] || { zaklad: 0, dph: 0 };
-        const duzp = xmlDate(f.datumUskutecneni || f.datumVystaveni);
-        const dicOdb = (f.zakaznikDic || "").replace(/\s/g,"");
-        return `      <VetaA4 c_rad="${i+1}" dic_odb="${dicOdb}" duzp="${duzp}" d_vyst="${xmlDate(f.datumVystaveni)}" c_evid_dd="${f.cislo||""}" zakl_dane1="${roundXml(g21.zaklad)}" dan1="${roundXml(g21.dph)}" zakl_dane2="${roundXml(g12.zaklad)}" dan2="${roundXml(g12.dph)}" zakl_dane3="0" rezim="0"/>`;
+        const t = calcFakturaTotal(f.polozky||[]);
+        const g21 = t.groups[21]||{zaklad:0,dph:0};
+        const g12 = t.groups[12]||{zaklad:0,dph:0};
+        // dppd = datum povinnosti přiznat daň = DUZP nebo datum vystavení
+        const dppd = fmtDate(new Date(f.datumUskutecneni||f.datumVystaveni));
+        // dic_odb = DIČ odběratele, jen číslice, bez CZ prefixu
+        const dicOdb = dicNum(f.zakaznikDic||"");
+        const ev = evCislo(f.cislo);
+        return `    <VetaA4 c_radku="${i+1}" dic_odb="${dicOdb}" c_evid_dd="${ev}" dppd="${dppd}" zakl_dane1="${roundXml(g21.zaklad)}" dan1="${roundXml(g21.dph)}" zakl_dane2="${roundXml(g12.zaklad)}" dan2="${roundXml(g12.dph)}"/>`;
     }).join("\n");
 
+    // Generuj řádky B2
     const b2Rows = b2Faktury.map((f, i) => {
-        const sazba = f.sazba || 21;
-        const duzp = xmlDate(f.datumUskutecneni || f.datumPrijeti);
-        const dicDod = (f.dodavatelDic || f.dodavatelIco || "").replace(/\s/g,"");
-        const z1 = sazba === 21 ? roundXml(f.castka||0) : "0";
-        const d1 = sazba === 21 ? roundXml(f.dph||0) : "0";
-        const z2 = sazba === 12 ? roundXml(f.castka||0) : "0";
-        const d2 = sazba === 12 ? roundXml(f.dph||0) : "0";
-        return `      <VetaB2 c_rad="${i+1}" dic_dod="${dicDod}" duzp="${duzp}" c_evid_dd="${f.cislo||f.id}" zakl_dane1="${z1}" dan1="${d1}" zakl_dane2="${z2}" dan2="${d2}" zakl_dane3="0"/>`;
+        const sazba = f.sazba||21;
+        const dppd = fmtDate(new Date(f.datumUskutecneni||f.datumPrijeti));
+        const dicDod = dicNum(f.dodavatelDic||f.dodavatelIco||"");
+        const ev = evCislo(f.cislo||f.id);
+        const z1 = sazba===21 ? roundXml(f.castka||0) : "0";
+        const d1 = sazba===21 ? roundXml(f.dph||0) : "0";
+        const z2 = sazba===12 ? roundXml(f.castka||0) : "0";
+        const d2 = sazba===12 ? roundXml(f.dph||0) : "0";
+        return `    <VetaB2 c_radku="${i+1}" dic_dod="${dicDod}" c_evid_dd="${ev}" dppd="${dppd}" zakl_dane1="${z1}" dan1="${d1}" zakl_dane2="${z2}" dan2="${d2}"/>`;
     }).join("\n");
 
     return `<?xml version="1.0" encoding="UTF-8"?>
@@ -2224,27 +2223,22 @@ function generateKHXml(data, rok, kvartal, hlaseni, prijateFaktury) {
   <DPHKH1>
     <VetaD
       d_poddp="${dnes}"
-      typ_platce="P"
-      kvartal="${kvartal}"
+      ctvrt="${kvartal}"
       rok="${rok}"
+      khdph_forma="B"
       dokument="KH1"
       k_uladis="DPH"
-      khdph_forma="B"
     />
     <VetaP
+      c_ufo="${cufo}"
       dic="${dicCislo}"
       zkrobchjm="${nazev}"
       typ_ds="F"
-      c_ufo="1"
     />
-    <Sekce_A>
 ${a4Rows}
-      <VetaA5 zakl_dane1="${roundXml(a5zaklad21)}" dan1="${roundXml(a5dph21)}" zakl_dane2="${roundXml(a5zaklad12)}" dan2="${roundXml(a5dph12)}" zakl_dane3="0"/>
-    </Sekce_A>
-    <Sekce_B>
+    <VetaA5 zakl_dane1="${roundXml(Math.round(a5z1))}" dan1="${roundXml(Math.round(a5d1))}" zakl_dane2="${roundXml(Math.round(a5z2))}" dan2="${roundXml(Math.round(a5d2))}"/>
 ${b2Rows}
-      <VetaB3 zakl_dane1="${roundXml(b3zaklad21)}" dan1="${roundXml(b3dph21)}" zakl_dane2="${roundXml(b3zaklad12)}" dan2="${roundXml(b3dph12)}" zakl_dane3="0"/>
-    </Sekce_B>
+    <VetaB3 zakl_dane1="${b3z1}" dan1="${b3d1}" zakl_dane2="${b3z2}" dan2="${b3d2}"/>
   </DPHKH1>
 </Pisemnost>`;
 }
