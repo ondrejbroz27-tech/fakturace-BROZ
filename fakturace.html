@@ -90,6 +90,10 @@ const initialState = {
         platceDPH: false,
         splatnost: 14,
         c_ufo: "",
+        zivnostEvidCislo: "",
+        zivnostCj: "",
+        zivnostVydal: "",
+        zivnostDatum: "",
     },
     zakaznici: [],
     faktury: [],
@@ -630,6 +634,12 @@ const generateInvoiceHTML = (faktura, firma, zakaznik) => {
   <p>Způsob platby: ${faktura.zpusobPlatby || "Převodem"}</p>
   <p>Variabilní symbol: ${faktura.variabilniSymbol || ((_a = faktura.cislo) === null || _a === void 0 ? void 0 : _a.replace(/\D/g, ""))}</p>
   ${faktura.poznamka ? `<p>Poznámka: ${faktura.poznamka}</p>` : ""}
+  <div style="border:1px solid #f59e0b;background:#fffbeb;border-radius:4px;padding:8px 12px;margin-top:12px;font-size:11px;color:#92400e">
+    Pro účely kontrolního hlášení v ČR uvádějte VS a č. faktury ve formátu pouze v číselném formátu bez písmen.
+  </div>
+  ${(firma.zivnostEvidCislo||firma.zivnostCj) ? `<div style="margin-top:10px;font-size:11px;color:#374151;border-top:1px solid #e5e7eb;padding-top:8px">
+    Ev.č.ŽL ${firma.zivnostEvidCislo||""}, č.j.: ${firma.zivnostCj||""}, vydal ${firma.zivnostVydal||""} ${firma.zivnostDatum||""}
+  </div>` : ""}
 </div>
 ${(firma.banka && (faktura.zpusobPlatby || "Převodem") === "Převodem") ? (() => {
   const vs = faktura.variabilniSymbol || (faktura.cislo || "").replace(/\D/g,"");
@@ -2165,7 +2175,9 @@ function generateKHXml(data, rok, kvartal, hlaseni, prijateFaktury) {
     // Helper: z DIČ "CZ12345678" nebo "12345678" → jen číslice
     const dicNum = (dic) => (dic||"").replace(/\s/g,"").replace(/^CZ/i,"").replace(/[^0-9]/g,"");
     // Helper: z čísla faktury vyextrahuj číselnout část pro c_evid_dd (max 60 znaků)
-    const evCislo = (cislo) => (cislo||"").replace(/[^0-9A-Za-z\-\/]/g,"").substring(0,60) || "0";
+    // c_evid_dd = pouze číslice z čísla faktury (např. FV20260001 → 20260001)
+    // c_evid_dd musí být POUZE číslice (FV20260001 → 20260001)
+    const evCislo = (cislo) => (cislo||"").replace(/[^0-9]/g,"").substring(0,20) || "0";
 
     // A4 — vydané faktury nad 10 000 Kč základ (§ 100 odst. 1 DPH)
     const vydaneFaktury = hlaseni.faktury;
@@ -2202,7 +2214,7 @@ function generateKHXml(data, rok, kvartal, hlaseni, prijateFaktury) {
         // dic_odb = DIČ odběratele, jen číslice, bez CZ prefixu
         const dicOdb = dicNum(f.zakaznikDic||"");
         const ev = evCislo(f.cislo);
-        return `    <VetaA4 c_radku="${i+1}" dic_odb="${dicOdb}" c_evid_dd="${ev}" dppd="${dppd}" zakl_dane1="${roundXml(g21.zaklad)}" dan1="${roundXml(g21.dph)}" zakl_dane2="${roundXml(g12.zaklad)}" dan2="${roundXml(g12.dph)}"/>`;
+        return `    <VetaA4 c_radku="${i+1}" dic_odb="${dicOdb}" c_evid_dd="${ev}" dppd="${dppd}" zakl_dane1="${roundXml(g21.zaklad)}" dan1="${roundXml(g21.dph)}" zakl_dane2="${roundXml(g12.zaklad)}" dan2="${roundXml(g12.dph)}" kod_pred_pl="1"/>`;
     }).join("\n");
 
     // Generuj řádky B2
@@ -4152,6 +4164,13 @@ function Nastaveni({ data, updateData, notify }) {
             React.createElement(Input, { label: "Telefon", value: firma.telefon, onChange: v => set("telefon", v) }),
             React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" } },
                 React.createElement(Input, { label: "V\u00FDchoz\u00ED splatnost (dny)", type: "number", value: firma.splatnost, onChange: v => set("splatnost", parseInt(v) || 14) })),
+            React.createElement("div", { style: { borderTop: "1px solid #e5e7eb", paddingTop: "12px", marginTop: "4px" } },
+                React.createElement("div", { style: { fontSize: "13px", fontWeight: "600", color: "#374151", marginBottom: "8px" } }, "\uD83D\uDCCB \u017divnostensk\u00FD list — \u00FAdaje na fakturu"),
+                React.createElement(Input, { label: "Ev. č. ŽL", value: firma.zivnostEvidCislo||"", onChange: v => set("zivnostEvidCislo", v), placeholder: "nap\u0159. 340701-1707" }),
+                React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" } },
+                    React.createElement(Input, { label: "\u010c.j.", value: firma.zivnostCj||"", onChange: v => set("zivnostCj", v), placeholder: "nap\u0159. 1/197/2001" }),
+                    React.createElement(Input, { label: "Datum vyd\u00e1n\u00ed", value: firma.zivnostDatum||"", onChange: v => set("zivnostDatum", v), placeholder: "nap\u0159. 19.11.2001" })),
+                React.createElement(Input, { label: "Vyd\u00e1n vyd\u00e1n (\u00fa\u0159ad)", value: firma.zivnostVydal||"", onChange: v => set("zivnostVydal", v), placeholder: "nap\u0159. ŽÚ MÚ Kralovice" })),
             React.createElement("div", { style: { display: "flex", gap: "12px", marginTop: "4px" } },
                 React.createElement(Btn, { onClick: save }, "\uD83D\uDCBE Ulo\u017Eit nastaven\u00ED"))),
         React.createElement("div", null,
