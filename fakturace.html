@@ -341,9 +341,12 @@ function calcPojisteniNemovitosti(nemovitosti) {
 
 const calcRocniPrijmy = (faktury, nemovitosti, rok, metoda9) => {
     metoda9 = metoda9 || "pausal30"; // "pausal30" nebo "skutecne"
-    const fakturacePrijmy = faktury
-        .filter((f) => new Date(f.datumVystaveni).getFullYear() === rok && f.stav !== "storno")
-        .reduce((sum, f) => sum + calcFakturaTotal(f.polozky || []).zaklad, 0);
+    // §7 příjmy — jen zaplacené faktury (příjem vzniká při úhradě, ne vystavením)
+    const fakturyRoku = faktury.filter((f) => new Date(f.datumVystaveni).getFullYear() === rok && f.stav !== "storno");
+    const fakturaceZaplacene = fakturyRoku.filter(f => f.stav === "zaplacena");
+    const fakturacePrijmy = fakturaceZaplacene.reduce((sum, f) => sum + calcFakturaTotal(f.polozky || []).zaklad, 0);
+    const fakturaceNezaplacene = fakturyRoku.filter(f => f.stav !== "zaplacena");
+    const fakturacePrijmyNezapl = fakturaceNezaplacene.reduce((sum, f) => sum + calcFakturaTotal(f.polozky || []).zaklad, 0);
     const nemovitostPrijmy = (nemovitosti.properties || [])
         .reduce((sum, p) => { var _a, _b; return sum + ((((_a = p.income) === null || _a === void 0 ? void 0 : _a.rent) || 0) + (((_b = p.income) === null || _b === void 0 ? void 0 : _b.other) || 0)) * 12; }, 0);
     // Výdaje pronajímatele (měsíční × 12) — bez odpisů a pojistění (ty se přidávají zvlášť)
@@ -371,6 +374,8 @@ const calcRocniPrijmy = (faktury, nemovitosti, rok, metoda9) => {
     const danPoSlevach = Math.max(0, dan - DAN_Z_PRIJMU_FO.slevaPoplatnik);
     return {
         fakturacePrijmy: Math.round(fakturacePrijmy * 100) / 100,
+        fakturacePrijmyNezapl: Math.round(fakturacePrijmyNezapl * 100) / 100,
+        fakturaceNezaplaceneCount: fakturaceNezaplacene.length,
         nemovitostPrijmy: Math.round(nemovitostPrijmy * 100) / 100,
         nemovitostVydajeMesicni: Math.round(nemovitostVydajeMesicni * 100) / 100,
         nemovitostOdpisy: Math.round(odpisy * 100) / 100,
@@ -1848,6 +1853,7 @@ function PrijateFaktury({ data, updateData, notify }) {
 
     const novaFaktura = () => {
         setEditF({ id: generateId(), cislo: "", dodavatelId: "", dodavatelNazev: "",
+            dodavatelDic: "", dodavatelIco: "",
             datumPrijeti: getToday(), datumSplatnosti: addDays(getToday(), 14),
             datumUskutecneni: getToday(), castka: 0, dph: 0, celkem: 0,
             sazba: 21, stav: "nezaplacena", popis: "", uplatnit: true });
@@ -1983,6 +1989,7 @@ function PrijataFakturaForm({ f, dodavatele, onSave, onClose }) {
                     options: [{ value: "", label: "-- vyberte nebo napište --" }, ...(dodavatele||[]).map(d => ({ value: d.id, label: d.nazev }))] }),
                 React.createElement(Input, { label: "Název dodavatele", value: form.dodavatelNazev||"", onChange: v => set("dodavatelNazev",v), required: true }),
                 React.createElement(Input, { label: "IČO dodavatele", value: form.dodavatelIco||"", onChange: v => set("dodavatelIco",v) }),
+                React.createElement(Input, { label: "DIČ dodavatele", value: form.dodavatelDic||"", onChange: v => set("dodavatelDic",v), placeholder: "CZ12345678" }),
                 React.createElement(Input, { label: "Číslo faktury", value: form.cislo||"", onChange: v => set("cislo",v) }),
                 React.createElement(Input, { label: "Popis / účel", value: form.popis||"", onChange: v => set("popis",v) })),
             React.createElement("div", null,
@@ -2064,18 +2071,230 @@ function DodavateleTab({ data, updateData, notify }) {
 // ============================================================
 // DPH SECTION
 // ============================================================
+// ============================================================
+// XML EXPORT — Daňové přiznání DPH + Kontrolní hlášení
+// Dle schémat MFČR pro EPO / Moje daně
+// ============================================================
+
+function padNum(n, len) {
+    return String(n).padStart(len, "0");
+}
+
+function xmlDate(dateStr) {
+    if (!dateStr) return "";
+    const d = new Date(dateStr);
+    return d.getFullYear() + "-" + padNum(d.getMonth()+1, 2) + "-" + padNum(d.getDate(), 2);
+}
+
+function roundXml(n) {
+    return String(Math.round(n || 0));
+}
+
+// Daňové přiznání k DPH — dle vzoru EPO DPHDP3
+function generateDPXml(data, rok, kvartal, hlaseni, prijateDphOdpocet, prijateFaktury) {
+    const firma = data.firma || {};
+    const dic = (firma.dic || "").replace(/\s/g, "");
+    const mesice = kvartal === 1 ? [1,2,3] : kvartal === 2 ? [4,5,6] : kvartal === 3 ? [7,8,9] : [10,11,12];
+    const datumPodani = new Date().toISOString().split("T")[0];
+
+    // Základ a DPH na výstupu
+    const r01z = Math.round(hlaseni.zaklad21);
+    const r01d = Math.round(hlaseni.dph21);
+    const r02z = Math.round(hlaseni.zaklad12);
+    const r02d = Math.round(hlaseni.dph12);
+    // Základ osvobozených plnění (ř. 50)
+    const r50 = Math.round(hlaseni.zaklad0);
+    // DPH na vstupu (odpočet)
+    const prijate21 = prijateFaktury.filter(f => (f.sazba||21) === 21);
+    const prijate12 = prijateFaktury.filter(f => (f.sazba||21) === 12);
+    const r40z = Math.round(prijate21.reduce((s,f) => s + (f.castka||0), 0));
+    const r40d = Math.round(prijate21.reduce((s,f) => s + (f.dph||0), 0));
+    const r41z = Math.round(prijate12.reduce((s,f) => s + (f.castka||0), 0));
+    const r41d = Math.round(prijate12.reduce((s,f) => s + (f.dph||0), 0));
+    // Celky
+    const danVystup = r01d + r02d;
+    const danVstup = r40d + r41d;
+    const danRozdil = danVystup - danVstup;
+    const vlastniPovinn = Math.max(0, danRozdil);
+    const nadmernyOdpocet = Math.max(0, -danRozdil);
+
+    // Datum konce zdaňovacího období
+    const posledniMesic = mesice[mesice.length - 1];
+    const posledniDenDatum = new Date(rok, posledniMesic, 0);
+    const datumDo = posledniDenDatum.getFullYear() + "-" + padNum(posledniDenDatum.getMonth()+1, 2) + "-" + padNum(posledniDenDatum.getDate(), 2);
+    const datumOd = rok + "-" + padNum(mesice[0], 2) + "-01";
+
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<Pisemnost nazevSW="FakturaceBROZ" verzeSW="1.0">
+  <DPHDP3 verzePis="01.02">
+    <VetaD
+      d_poddp="${datumPodani}"
+      dic="${dic}"
+      typ_platce="kvartal"
+      zdobd_od="${datumOd}"
+      zdobd_do="${datumDo}"
+      mesic="${posledniMesic}"
+      rok="${rok}"
+      trans="A"
+      dokument="DP3"
+      khdph="N"
+    />
+    <VetaP
+      c_ufo_cds=""
+      dic="${dic}"
+      jmeno="${(firma.nazev||"").replace(/&/g,"&amp;").replace(/</g,"&lt;")}"
+      stat="CZ"
+    />
+    <VetaR
+      r01="${roundXml(r01z)}" r01d="${roundXml(r01d)}"
+      r02="${roundXml(r02z)}" r02d="${roundXml(r02d)}"
+      r10="0" r10d="0"
+      r11="0" r11d="0"
+      r26="0"
+      r30="0" r30d="0"
+      r31="0" r31d="0"
+      r32="0"
+      r33="0"
+      r34="0"
+      r40="${roundXml(r40z)}" r40d="${roundXml(r40d)}"
+      r41="${roundXml(r41z)}" r41d="${roundXml(r41d)}"
+      r42="0" r42d="0"
+      r43="0" r43d="0"
+      r44="0" r44d="0"
+      r45="0"
+      r46="${roundXml(r50)}"
+      r47="0"
+      r50="${roundXml(r40d + r41d)}"
+      r51="0"
+      r52="0"
+      r53="${roundXml(r40d + r41d)}"
+      r60="0"
+      r61="0"
+      r62="${roundXml(danVystup)}"
+      r63="${roundXml(danVstup)}"
+      r64="${roundXml(danRozdil)}"
+      r65="0"
+      r66="0"
+      r71="${roundXml(vlastniPovinn)}"
+      r72="${roundXml(nadmernyOdpocet)}"
+    />
+  </DPHDP3>
+</Pisemnost>`;
+}
+
+// Kontrolní hlášení DPH — dle schématu DPHKH1
+function generateKHXml(data, rok, kvartal, hlaseni, prijateFaktury) {
+    const firma = data.firma || {};
+    const dic = (firma.dic || "").replace(/\s/g, "");
+    const mesice = kvartal === 1 ? [1,2,3] : kvartal === 2 ? [4,5,6] : kvartal === 3 ? [7,8,9] : [10,11,12];
+    const datumPodani = new Date().toISOString().split("T")[0];
+    const posledniMesic = mesice[mesice.length - 1];
+    const datumDo = new Date(rok, posledniMesic, 0);
+    const datumDoStr = datumDo.getFullYear() + "-" + padNum(datumDo.getMonth()+1, 2) + "-" + padNum(datumDo.getDate(), 2);
+    const datumOdStr = rok + "-" + padNum(mesice[0], 2) + "-01";
+
+    // A4 — vydané faktury nad 10 000 Kč základ (sekce A4 = přijatá zdanitelná plnění od plátců)
+    // A5 — vydané faktury do 10 000 Kč (souhrnný řádek)
+    const vydaneFaktury = hlaseni.faktury;
+    const a4Faktury = vydaneFaktury.filter(f => {
+        const t = calcFakturaTotal(f.polozky || []);
+        return t.zaklad >= 10000;
+    });
+    const a5Faktury = vydaneFaktury.filter(f => {
+        const t = calcFakturaTotal(f.polozky || []);
+        return t.zaklad < 10000;
+    });
+
+    // A5 souhrnné hodnoty
+    const a5zaklad21 = Math.round(a5Faktury.reduce((s,f) => { const t = calcFakturaTotal(f.polozky||[]); return s + ((t.groups[21]||{}).zaklad||0); }, 0));
+    const a5dph21 = Math.round(a5Faktury.reduce((s,f) => { const t = calcFakturaTotal(f.polozky||[]); return s + ((t.groups[21]||{}).dph||0); }, 0));
+    const a5zaklad12 = Math.round(a5Faktury.reduce((s,f) => { const t = calcFakturaTotal(f.polozky||[]); return s + ((t.groups[12]||{}).zaklad||0); }, 0));
+    const a5dph12 = Math.round(a5Faktury.reduce((s,f) => { const t = calcFakturaTotal(f.polozky||[]); return s + ((t.groups[12]||{}).dph||0); }, 0));
+
+    // B2 — přijaté faktury nad 10 000 Kč základ
+    // B3 — přijaté faktury do 10 000 Kč (souhrnný)
+    const prijate = prijateFaktury;
+    const b2Faktury = prijate.filter(f => (f.castka||0) >= 10000);
+    const b3Faktury = prijate.filter(f => (f.castka||0) < 10000);
+    const b3zaklad21 = Math.round(b3Faktury.filter(f=>(f.sazba||21)===21).reduce((s,f)=>s+(f.castka||0),0));
+    const b3dph21 = Math.round(b3Faktury.filter(f=>(f.sazba||21)===21).reduce((s,f)=>s+(f.dph||0),0));
+    const b3zaklad12 = Math.round(b3Faktury.filter(f=>(f.sazba||21)===12).reduce((s,f)=>s+(f.castka||0),0));
+    const b3dph12 = Math.round(b3Faktury.filter(f=>(f.sazba||21)===12).reduce((s,f)=>s+(f.dph||0),0));
+
+    const a4Rows = a4Faktury.map((f, i) => {
+        const t = calcFakturaTotal(f.polozky || []);
+        const g21 = t.groups[21] || { zaklad: 0, dph: 0 };
+        const g12 = t.groups[12] || { zaklad: 0, dph: 0 };
+        const duzp = xmlDate(f.datumUskutecneni || f.datumVystaveni);
+        const dicOdb = (f.zakaznikDic || "").replace(/\s/g,"");
+        return `      <VetaA4 c_rad="${i+1}" dic_odb="${dicOdb}" duzp="${duzp}" d_vyst="${xmlDate(f.datumVystaveni)}" c_evid_dd="${f.cislo||""}" zakl_dane1="${roundXml(g21.zaklad)}" dan1="${roundXml(g21.dph)}" zakl_dane2="${roundXml(g12.zaklad)}" dan2="${roundXml(g12.dph)}" zakl_dane3="0" rezim="0"/>`;
+    }).join("\n");
+
+    const b2Rows = b2Faktury.map((f, i) => {
+        const sazba = f.sazba || 21;
+        const duzp = xmlDate(f.datumUskutecneni || f.datumPrijeti);
+        const dicDod = (f.dodavatelDic || f.dodavatelIco || "").replace(/\s/g,"");
+        const z1 = sazba === 21 ? roundXml(f.castka||0) : "0";
+        const d1 = sazba === 21 ? roundXml(f.dph||0) : "0";
+        const z2 = sazba === 12 ? roundXml(f.castka||0) : "0";
+        const d2 = sazba === 12 ? roundXml(f.dph||0) : "0";
+        return `      <VetaB2 c_rad="${i+1}" dic_dod="${dicDod}" duzp="${duzp}" c_evid_dd="${f.cislo||f.id}" zakl_dane1="${z1}" dan1="${d1}" zakl_dane2="${z2}" dan2="${d2}" zakl_dane3="0"/>`;
+    }).join("\n");
+
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<Pisemnost nazevSW="FakturaceBROZ" verzeSW="1.0">
+  <DPHKH1 verzePis="01.02">
+    <VetaD
+      d_poddp="${datumPodani}"
+      dic="${dic}"
+      typ_platce="kvartal"
+      zdobd_od="${datumOdStr}"
+      zdobd_do="${datumDoStr}"
+      mesic="${posledniMesic}"
+      rok="${rok}"
+      trans="A"
+      dokument="KH1"
+    />
+    <VetaP
+      dic="${dic}"
+      jmeno="${(firma.nazev||"").replace(/&/g,"&amp;").replace(/</g,"&lt;")}"
+      stat="CZ"
+    />
+    <Sekce_A>
+${a4Rows}
+      <VetaA5 zakl_dane1="${roundXml(a5zaklad21)}" dan1="${roundXml(a5dph21)}" zakl_dane2="${roundXml(a5zaklad12)}" dan2="${roundXml(a5dph12)}" zakl_dane3="0"/>
+    </Sekce_A>
+    <Sekce_B>
+${b2Rows}
+      <VetaB3 zakl_dane1="${roundXml(b3zaklad21)}" dan1="${roundXml(b3dph21)}" zakl_dane2="${roundXml(b3zaklad12)}" dan2="${roundXml(b3dph12)}" zakl_dane3="0"/>
+    </Sekce_B>
+  </DPHKH1>
+</Pisemnost>`;
+}
+
+function downloadXml(content, filename) {
+    const blob = new Blob([content], { type: "application/xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
 function DPHSection({ data }) {
     const [printHtml, setPrintHtml] = (0, useState)(null);
     const [rok, setRok] = (0, useState)(new Date().getFullYear());
     const [kvartal, setKvartal] = (0, useState)(Math.ceil((new Date().getMonth() + 1) / 3));
     const hlaseni = calcDPHHlaseni(data.faktury, rok, kvartal);
     // Přijaté faktury DPH odpočet
-    const prijateDphOdpocet = (data.prijateFaktury||[]).filter(f => {
+    const prijateFaktury = (data.prijateFaktury||[]).filter(f => {
         if (f.uplatnit === false) return false;
         const d = new Date(f.datumUskutecneni || f.datumPrijeti);
         const q = Math.ceil((d.getMonth()+1)/3);
         return d.getFullYear() === rok && q === kvartal;
-    }).reduce((s,f) => s + (f.dph||0), 0);
+    });
+    const prijateDphOdpocet = prijateFaktury.reduce((s,f) => s + (f.dph||0), 0);
     const printDPH = () => {
         const __html = `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8">
     <title>DPH Přiznání Q${kvartal}/${rok}</title>
@@ -2129,7 +2348,15 @@ function DPHSection({ data }) {
                         "(",
                         months,
                         ")")))),
-                React.createElement(Btn, { onClick: printDPH, variant: "secondary" }, "\uD83D\uDDA8\uFE0F Tisk p\u0159izn\u00E1n\u00ED"))),
+                React.createElement(Btn, { onClick: printDPH, variant: "secondary" }, "\uD83D\uDDA8\uFE0F Tisk p\u0159izn\u00E1n\u00ED"),
+                React.createElement(Btn, { onClick: () => {
+                    const xml = generateDPXml(data, rok, kvartal, hlaseni, prijateDphOdpocet, prijateFaktury);
+                    downloadXml(xml, `DPH_priznani_Q${kvartal}_${rok}.xml`);
+                }, variant: "secondary" }, "\uD83D\uDCE5 XML Přiznání DPH"),
+                React.createElement(Btn, { onClick: () => {
+                    const xml = generateKHXml(data, rok, kvartal, hlaseni, prijateFaktury);
+                    downloadXml(xml, `Kontrolni_hlaseni_Q${kvartal}_${rok}.xml`);
+                }, variant: "secondary" }, "\uD83D\uDCE5 XML Kontrolní hlášení"))),
         React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: "16px", marginBottom: "24px" } },
             React.createElement(StatCard, { label: "Z\u00E1klad 21%", value: formatCZK(hlaseni.zaklad21), color: "#1a3a5c" }),
             React.createElement(StatCard, { label: "DPH 21%", value: formatCZK(hlaseni.dph21), color: "#dc2626" }),
@@ -2426,6 +2653,10 @@ function DanZPrijmu({ data, updateData, notify }) {
                 rocni.nemovitostPojisteni > 0 && React.createElement("div", null, "\uD83D\uDEE1\uFE0F Poji\u0161t\u011Bn\u00ED nemovitost\u00ED: ", React.createElement("strong", null, formatCZK(rocni.nemovitostPojisteni))),
                 rocni.nemovitostOdpisy === 0 && React.createElement("div", { style: { color: "#9ca3af" } }, "\u26A0\uFE0F Odpisy: nepou\u017E\u00EDv\u00E1ny (nastav v z\u00E1lo\u017Ece Nemovitosti)"))),
 
+        rocni.fakturaceNezaplaceneCount > 0 && React.createElement("div", { style: { background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: "10px", padding: "12px 16px", marginBottom: "16px", fontSize: "13px" } },
+            React.createElement("strong", { style: { color: "#92400e" } }, "\u26A0\uFE0F ", rocni.fakturaceNezaplaceneCount, " nezaplacen\u00E1 faktura/faktury (", formatCZK(rocni.fakturacePrijmyNezapl), " z\u00E1klad) nevstupuje do dan\u011B z p\u0159\u00EDjm\u016F."),
+            React.createElement("div", { style: { color: "#78350f", marginTop: "4px" } }, "P\u0159\u00EDjmy se po\u010D\u00EDtaj\u00ED a\u017E po ozna\u010Den\u00ED faktury jako \'Zaplacena\' v z\u00E1lo\u017Ece Fakturace.")),
+
         React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: "12px", marginBottom: "20px" } },
             React.createElement(StatCard, { label: "P\u0159\u00EDjmy celkem", value: formatCZK(rocni.celkemPrijmy), color: "#1a3a5c" }),
             React.createElement(StatCard, { label: "V\u00FDdaje nemovitosti", value: formatCZK(rocni.nemovitostVydaje), color: "#dc2626" }),
@@ -2500,7 +2731,8 @@ function DanZPrijmu({ data, updateData, notify }) {
                     rok),
                 React.createElement("table", { style: { width: "100%", fontSize: "13px" } },
                     React.createElement("tbody", null, [
-                        ["Příjmy z fakturace (§7)", formatCZK(rocni.fakturacePrijmy), false],
+                        ["Příjmy z fakturace §7 (zaplacené)", formatCZK(rocni.fakturacePrijmy), false],
+                        ...(rocni.fakturaceNezaplaceneCount > 0 ? [["  ⚠️ Nezaplacené (nevstupují)", `+ ${formatCZK(rocni.fakturacePrijmyNezapl)}`, false, "#9ca3af"]] : []),
                         ["Příjmy z pronájmu (§9)", formatCZK(rocni.nemovitostPrijmy), false],
                         ...(metoda9 === "skutecne" && rocni.nemovitostVydajeMesicni > 0 ? [["  Výdaje pronajímatele", `- ${formatCZK(rocni.nemovitostVydajeMesicni)}`, false, "#6b7280"]] : []),
                         ...(metoda9 === "skutecne" && rocni.nemovitostOdpisy > 0 ? [["  Odpisy nemovitostí", `- ${formatCZK(rocni.nemovitostOdpisy)}`, false, "#6b7280"]] : []),
