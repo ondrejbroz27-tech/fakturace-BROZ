@@ -3302,10 +3302,11 @@ function generateKHXml(data, rok, kvartal, hlaseni, prijateFaktury) {
         const g12 = t.groups[12]||{zaklad:0,dph:0};
         // dppd = datum povinnosti přiznat daň = DUZP nebo datum vystavení
         const dppd = fmtDate(new Date(f.datumUskutecneni||f.datumVystaveni));
-        // dic_odb = DIČ odběratele, jen číslice, bez CZ prefixu
-        const dicOdb = dicNum(f.zakaznikDic||"");
+        // dic_odb = DIČ odběratele - z faktury nebo fallback z databáze zákazníků
+        const zak = (data.zakaznici||[]).find(z => z.id === f.zakaznikId);
+        const dicOdb = dicNum(f.zakaznikDic || (zak && zak.dic) || "");
         const ev = evCislo(f.cislo);
-        return `    <VetaA4 c_radku="${i+1}" dic_odb="${dicOdb}" c_evid_dd="${ev}" dppd="${dppd}" zakl_dane1="${roundXml(g21.zaklad)}" dan1="${roundXml(g21.dph)}" zakl_dane2="${roundXml(g12.zaklad)}" dan2="${roundXml(g12.dph)}" kod_pred_pl="1"/>`;
+        return `    <VetaA4 c_radku="${i+1}" dic_odb="${dicOdb}" c_evid_dd="${ev}" dppd="${dppd}" zakl_dane1="${roundXml(g21.zaklad)}" dan1="${roundXml(g21.dph)}" zakl_dane2="${roundXml(g12.zaklad)}" dan2="${roundXml(g12.dph)}" kod_pred_pl="1" krp="0" onp="N"/>`;
     }).join("\n");
 
     // Generuj řádky B2
@@ -3318,7 +3319,7 @@ function generateKHXml(data, rok, kvartal, hlaseni, prijateFaktury) {
         const d1 = sazba===21 ? roundXml(f.dph||0) : "0";
         const z2 = sazba===12 ? roundXml(f.castka||0) : "0";
         const d2 = sazba===12 ? roundXml(f.dph||0) : "0";
-        return `    <VetaB2 c_radku="${i+1}" dic_dod="${dicDod}" c_evid_dd="${ev}" dppd="${dppd}" zakl_dane1="${z1}" dan1="${d1}" zakl_dane2="${z2}" dan2="${d2}"/>`;
+        return `    <VetaB2 c_radku="${i+1}" dic_dod="${dicDod}" c_evid_dd="${ev}" dppd="${dppd}" zakl_dane1="${z1}" dan1="${d1}" zakl_dane2="${z2}" dan2="${d2}" krp="0" onp="N"/>`;
     }).join("\n");
 
     return `<?xml version="1.0" encoding="UTF-8"?>
