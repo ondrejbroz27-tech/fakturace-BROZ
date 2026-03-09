@@ -81,6 +81,11 @@ const addDays = (date, days) => {
     d.setDate(d.getDate() + days);
     return d.toISOString().split("T")[0];
 };
+// Konverze YYYY-MM-DD na DD.MM.YYYY pro Fio API
+const convertToFioDateFormat = (dateStr) => {
+    const [year, month, day] = dateStr.split('-');
+    return `${day}.${month}.${year}`;
+};
 const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
 const generateInvoiceNumber = (invoices, prefix = "FV") => {
     const year = new Date().getFullYear();
@@ -6264,8 +6269,8 @@ function PaymentsPanel({ data, updateData, notify }) {
     try {
       const trans = await fetchFioTransactions(
         fioToken, 
-        dateFrom.replace(/-/g, '.'), 
-        dateTo.replace(/-/g, '.')
+        convertToFioDateFormat(dateFrom), 
+        convertToFioDateFormat(dateTo)
       );
       
       setTransactions(trans);
