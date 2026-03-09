@@ -5824,7 +5824,9 @@ function ConfirmDialog2Btn({ label, message, onConfirm }) {
 // FIO BANK API FUNCTIONS
 // ============================================================
 async function fetchFioTransactions(token, dateFrom, dateTo) {
-  const url = `https://www.fio.cz/ib_api/rest/periods/${token}/${dateFrom}/${dateTo}/transactions.json`;
+  // Cloudflare Worker proxy - bezpečný a spolehlivý
+  const cloudflareProxy = 'https://fio-proxy.ondrejbroz27.workers.dev/';
+  const url = `${cloudflareProxy}?token=${token}&from=${dateFrom}&to=${dateTo}`;
   
   try {
     const response = await fetch(url);
@@ -6442,6 +6444,7 @@ function PaymentsPanel({ data, updateData, notify }) {
     // Date Range & Load
     React.createElement(Card, { style: { marginBottom: '24px' } },
       React.createElement('h3', { style: { marginTop: 0 } }, '📅 Načíst transakce z Fio API'),
+      
       React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '12px', marginBottom: '12px' } },
         React.createElement('div', null,
           React.createElement('label', { style: { display: 'block', fontSize: '12px', marginBottom: '4px', color: '#6b7280' } }, 'Od data'),
