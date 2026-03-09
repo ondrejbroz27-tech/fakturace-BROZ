@@ -3,12 +3,27 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <title>Fakturace CZ</title>
+  <title>Fakturace CZ Pro 2026 🚀</title>
+  
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f0f4fa; }
-    ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
+    
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Roboto', sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      background-attachment: fixed;
+      line-height: 1.6;
+    }
+    
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #f1f1f1; }
+    ::-webkit-scrollbar-thumb { 
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 4px; 
+    }
+    ::-webkit-scrollbar-thumb:hover { 
+      background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+    }
   </style>
 </head>
 <body>
@@ -105,6 +120,150 @@ const initialState = {
     metodaVydaju: "pausal",
     najemnici: [],
     nemovitosti: { properties: [] },
+    
+    // NEW: Payment matching & rentals management
+    fioToken: "",
+    platby: [], // Matched payments from Fio
+    emailSablona: `Dobrý den,
+
+chtěl/a bych Vás upozornit, že jsme k dnešnímu dni neobdrželi platbu nájemného ve výši {CASTKA} za měsíc {MESIC}.
+
+Původní termín splatnosti: {SPLATNOST}
+
+Prosím o uhrazení na účet: {UCET}
+
+Děkuji za pochopení.
+
+S pozdravem,
+{JMENO_PRONAJIMATEL}`,
+    upominky: [], // History of sent reminders
+    
+    // NEW: Email reminder templates for invoices and rentals
+    emailSablonyFaktury: {
+        upominka1: `Dobrý den,
+
+obracím se na Vás ohledně úhrady faktury č. {CISLO_FAKTURY} na částku {CASTKA} se splatností ke dni {DATUM_SPLATNOSTI}.
+
+K dnešnímu dni jsme tuto platbu neobdrželi. Věřím, že se jedná pouze o nedopatření, a prosím o úhradu do {LHUTA} dnů.
+
+Platbu prosím uhraďte na účet: {UCET}
+Variabilní symbol: {VS}
+
+Děkuji za pochopení.
+
+S pozdravem,
+{JMENO_FIRMY}
+{EMAIL}
+{TELEFON}`,
+
+        upominka2: `Dobrý den,
+
+dne {DATUM_UPOMINKY1} jsme Vás upozornili na nezaplacenou fakturu č. {CISLO_FAKTURY} na částku {CASTKA} se splatností {DATUM_SPLATNOSTI}.
+
+K dnešnímu dni jsme platbu stále neobdrželi.
+
+Tímto Vás vyzývám k úhradě do {LHUTA} dnů. V opačném případě budeme nuceni uplatnit:
+• Úrok z prodlení ve výši {UROK}% p.a.
+• Paušální náhradu nákladů spojených s vymáháním ve výši 1 200 Kč
+
+Platbu prosím uhraďte na účet: {UCET}
+Variabilní symbol: {VS}
+
+S pozdravem,
+{JMENO_FIRMY}
+{EMAIL}
+{TELEFON}`,
+
+        upominka3: `PŘEDŽALOBNÍ VÝZVA
+
+Dobrý den,
+
+opakovaně jsme Vás upozorňovali na nezaplacenou fakturu č. {CISLO_FAKTURY} na částku {CASTKA} se splatností {DATUM_SPLATNOSTI}.
+
+Dluh k dnešnímu dni činí:
+• Jistina: {CASTKA}
+• Úrok z prodlení: {UROK_CASTKA}
+• Paušální náhrada nákladů: 1 200 Kč
+• CELKEM K ÚHRADĚ: {CELKEM}
+
+Tímto Vás v souladu s § 1799 občanského zákoníku vyzývám k úhradě výše uvedené částky do {LHUTA} dnů od doručení této výzvy.
+
+Pokud nebude dlužná částka v této lhůtě uhrazena, budeme nuceni podat žalobu k příslušnému soudu bez dalšího upozornění.
+
+Platbu uhraďte na účet: {UCET}
+Variabilní symbol: {VS}
+
+S pozdravem,
+{JMENO_FIRMY}
+{EMAIL}
+{TELEFON}
+IČ: {ICO}`
+    },
+    
+    emailSablonyNajmy: {
+        upominka1: `Dobrý den,
+
+obracím se na Vás ve věci úhrady nájemného za měsíc {MESIC} ve výši {CASTKA}.
+
+Dle nájemní smlouvy mělo být nájemné uhrazeno do {DATUM_SPLATNOSTI}. K dnešnímu dni jsme platbu neobdrželi.
+
+V souladu s § 2228 občanského zákoníku Vás tímto vyzývám k úhradě dlužného nájemného do {LHUTA} dnů.
+
+Platbu prosím uhraďte na účet: {UCET}
+
+Děkuji za pochopení.
+
+S pozdravem,
+{JMENO_PRONAJIMATEL}
+{EMAIL}
+{TELEFON}`,
+
+        upominka2: `UPOMÍNKA - NEZAPLACENÉ NÁJEMNÉ
+
+Dobrý den,
+
+dne {DATUM_UPOMINKY1} jsem Vás upozornil/a na nezaplacené nájemné za měsíc {MESIC} ve výši {CASTKA}.
+
+K dnešnímu dni jsme platbu stále neobdrželi.
+
+V souladu s § 2228 občanského zákoníku Vás tímto opětovně vyzývám k úhradě dlužného nájemného do {LHUTA} dnů.
+
+UPOZORNĚNÍ: Pokud nebude dlužné nájemné uhrazeno, jsem oprávněn/a postupovat podle § 2288 a § 2291 občanského zákoníku, což může vést k ukončení nájemního vztahu.
+
+Dlužná částka: {CASTKA}
+Platbu uhraďte na účet: {UCET}
+
+S pozdravem,
+{JMENO_PRONAJIMATEL}
+{EMAIL}
+{TELEFON}`,
+
+        upominkaVypoved: `VÝZVA K ÚHRADĚ DLUŽNÉHO NÁJEMNÉHO - UPOZORNĚNÍ NA MOŽNOST OKAMŽITÉ VÝPOVĚDI
+
+Dobrý den,
+
+v souladu s § 2291 odst. 2 zákona č. 89/2012 Sb., občanského zákoníku, Vás tímto vyzývám k úhradě dlužného nájemného.
+
+Dlužné nájemné:
+{MESICE_DLUHU}
+CELKEM: {CASTKA}
+
+Tato výzva je zasílána jako poslední upozornění před podáním výpovědi z nájmu bez výpovědní doby podle § 2291 odst. 1 občanského zákoníku.
+
+Poskytuj Vám přiměřenou lhůtu {LHUTA} dnů k úhradě dlužného nájemného.
+
+UPOZORNĚNÍ: Pokud nebude dlužné nájemné v této lhůtě uhrazeno, jsem oprávněn/a podat okamžitou výpověď z nájmu bez výpovědní doby. V takovém případě je nájemce povinen odevzdat byt/nemovitost bez zbytečného odkladu, nejpozději do 1 měsíce od skončení nájmu.
+
+Platbu uhraďte na účet: {UCET}
+
+S pozdravem,
+{JMENO_PRONAJIMATEL}
+{EMAIL}
+{TELEFON}
+IČ: {ICO}
+
+Příloha: Kopie nájemní smlouvy`
+    },
 }
 // ============================================================
 // UKÁZKOVÁ DATA (načtou se jen na vyžádání)
@@ -122,12 +281,93 @@ const sampleData = {
         { id: "zak3", aktivni: true, nazev: "Gamma Design s.r.o.", ico: "99001122", dic: "CZ99001122", ulice: "Kreativni 3", mesto: "Praha 2", psc: "12000", email: "hello@gamma.cz", telefon: "+420 211 222 333", poznamka: "" },
     ],
     faktury: [
+        // ROK 2025 - stávající testovací data
         { id: "fak1", cislo: "FV20250001", zakaznikId: "zak1", zakaznikNazev: "Acme s.r.o.", datumVystaveni: "2025-01-10", datumSplatnosti: "2025-01-24", datumUskutecneni: "2025-01-10", stav: "uhrazena", poznamka: "Vyvoj software Q1", polozky: [{ id: "p1", popis: "Vyvoj webove aplikace", mnozstvi: 40, jednotka: "hod", cena: 1500, sazba: 21 }, { id: "p2", popis: "Konzultace", mnozstvi: 5, jednotka: "hod", cena: 2000, sazba: 21 }] },
         { id: "fak2", cislo: "FV20250002", zakaznikId: "zak2", zakaznikNazev: "Beta Technologies a.s.", datumVystaveni: "2025-02-05", datumSplatnosti: "2025-02-19", datumUskutecneni: "2025-02-05", stav: "uhrazena", poznamka: "", polozky: [{ id: "p3", popis: "IT podpora", mnozstvi: 20, jednotka: "hod", cena: 1800, sazba: 21 }, { id: "p4", popis: "Servis serveru", mnozstvi: 1, jednotka: "ks", cena: 8500, sazba: 21 }] },
         { id: "fak3", cislo: "FV20250003", zakaznikId: "zak3", zakaznikNazev: "Gamma Design s.r.o.", datumVystaveni: "2025-03-15", datumSplatnosti: "2025-03-29", datumUskutecneni: "2025-03-15", stav: "vystavena", poznamka: "", polozky: [{ id: "p5", popis: "Graficky design", mnozstvi: 30, jednotka: "hod", cena: 1200, sazba: 21 }] },
         { id: "fak4", cislo: "FV20250004", zakaznikId: "zak1", zakaznikNazev: "Acme s.r.o.", datumVystaveni: "2025-04-01", datumSplatnosti: "2025-04-15", datumUskutecneni: "2025-04-01", stav: "uhrazena", poznamka: "Q2 vyvoj", polozky: [{ id: "p6", popis: "Backend vyvoj", mnozstvi: 60, jednotka: "hod", cena: 1500, sazba: 21 }] },
-        { id: "fak5", cislo: "FV20250005", zakaznikId: "zak2", zakaznikNazev: "Beta Technologies a.s.", datumVystaveni: "2025-05-20", datumSplatnosti: "2025-06-03", datumUskutecneni: "2025-05-20", stav: "po_splatnosti", poznamka: "Nezaplaceno!", polozky: [{ id: "p7", popis: "Analyza systemu", mnozstvi: 15, jednotka: "hod", cena: 2200, sazba: 21 }] },
+        { id: "fak5", cislo: "FV20250005", zakaznikId: "zak2", zakaznikNazev: "Beta Technologies a.s.", datumVystaveni: "2025-05-20", datumSplatnosti: "2025-06-03", datumUskutecneni: "2025-05-20", stav: "vystavena", poznamka: "Nezaplaceno!", polozky: [{ id: "p7", popis: "Analyza systemu", mnozstvi: 15, jednotka: "hod", cena: 2200, sazba: 21 }] },
         { id: "fak6", cislo: "FV20250006", zakaznikId: "zak3", zakaznikNazev: "Gamma Design s.r.o.", datumVystaveni: "2025-06-10", datumSplatnosti: "2025-06-24", datumUskutecneni: "2025-06-10", stav: "uhrazena", poznamka: "", polozky: [{ id: "p8", popis: "UI/UX design", mnozstvi: 25, jednotka: "hod", cena: 1400, sazba: 21 }, { id: "p9", popis: "Prototyp aplikace", mnozstvi: 1, jednotka: "ks", cena: 5000, sazba: 21 }] },
+        
+        // ROK 2026 - TESTOVACÍ DATA PRO OVĚŘENÍ VÝPOČTŮ
+        // Scénář: Příjmy z fakturace = 702 000 Kč (zaplaceno)
+        //         Nezaplaceno: 50 000 Kč (nemělo by se počítat do příjmů)
+        
+        // 1. UHRAZENÁ faktura - 100 000 Kč bez DPH (50 hod × 2000 Kč)
+        { id: "fak2026_1", cislo: "FV20260001", zakaznikId: "zak1", zakaznikNazev: "Acme s.r.o.", 
+          datumVystaveni: "2026-01-15", datumSplatnosti: "2026-01-29", datumUskutecneni: "2026-01-15", 
+          datumUhrady: "2026-01-28",
+          stav: "uhrazena", poznamka: "Zaplaceno bankovním převodem", 
+          polozky: [
+            { id: "p2026_1", popis: "Vývoj aplikace - Fáze 1", mnozstvi: 50, jednotka: "hod", cena: 2000, sazba: 21 }
+          ]
+        },
+        
+        // 2. UHRAZENÁ faktura - 150 000 Kč bez DPH (100 hod × 1500 Kč)
+        { id: "fak2026_2", cislo: "FV20260002", zakaznikId: "zak2", zakaznikNazev: "Beta Technologies a.s.", 
+          datumVystaveni: "2026-02-10", datumSplatnosti: "2026-02-24", datumUskutecneni: "2026-02-10", 
+          datumUhrady: "2026-02-20",
+          stav: "uhrazena", poznamka: "Zaplaceno v hotovosti", 
+          polozky: [
+            { id: "p2026_2a", popis: "Backend vývoj", mnozstvi: 80, jednotka: "hod", cena: 1500, sazba: 21 },
+            { id: "p2026_2b", popis: "Databázový design", mnozstvi: 20, jednotka: "hod", cena: 1500, sazba: 21 }
+          ]
+        },
+        
+        // 3. UHRAZENÁ faktura - 80 000 Kč bez DPH (40 hod × 2000 Kč)
+        { id: "fak2026_3", cislo: "FV20260003", zakaznikId: "zak3", zakaznikNazev: "Gamma Design s.r.o.", 
+          datumVystaveni: "2026-03-05", datumSplatnosti: "2026-03-19", datumUskutecneni: "2026-03-05", 
+          datumUhrady: "2026-03-15",
+          stav: "uhrazena", poznamka: "Spárováno automaticky z Fio", 
+          polozky: [
+            { id: "p2026_3", popis: "Grafický design + UI", mnozstvi: 40, jednotka: "hod", cena: 2000, sazba: 21 }
+          ]
+        },
+        
+        // 4. UHRAZENÁ faktura - 120 000 Kč bez DPH (60 hod × 2000 Kč)
+        { id: "fak2026_4", cislo: "FV20260004", zakaznikId: "zak1", zakaznikNazev: "Acme s.r.o.", 
+          datumVystaveni: "2026-04-12", datumSplatnosti: "2026-04-26", datumUskutecneni: "2026-04-12", 
+          datumUhrady: "2026-04-25",
+          stav: "uhrazena", poznamka: "Platba kartou", 
+          polozky: [
+            { id: "p2026_4", popis: "Implementace API", mnozstvi: 60, jednotka: "hod", cena: 2000, sazba: 21 }
+          ]
+        },
+        
+        // 5. UHRAZENÁ faktura - 90 000 Kč bez DPH (60 hod × 1500 Kč)
+        { id: "fak2026_5", cislo: "FV20260005", zakaznikId: "zak2", zakaznikNazev: "Beta Technologies a.s.", 
+          datumVystaveni: "2026-05-08", datumSplatnosti: "2026-05-22", datumUskutecneni: "2026-05-08", 
+          datumUhrady: "2026-05-20",
+          stav: "uhrazena", poznamka: "Zaplaceno", 
+          polozky: [
+            { id: "p2026_5", popis: "Testování a debug", mnozstvi: 60, jednotka: "hod", cena: 1500, sazba: 21 }
+          ]
+        },
+        
+        // 6. UHRAZENÁ faktura - 162 000 Kč bez DPH (2× 40 000 + 1× 82 000)
+        { id: "fak2026_6", cislo: "FV20260006", zakaznikId: "zak3", zakaznikNazev: "Gamma Design s.r.o.", 
+          datumVystaveni: "2026-06-15", datumSplatnosti: "2026-06-29", datumUskutecneni: "2026-06-15", 
+          datumUhrady: "2026-06-28",
+          stav: "uhrazena", poznamka: "Velká zakázka", 
+          polozky: [
+            { id: "p2026_6a", popis: "Kompletní redesign webu", mnozstvi: 40, jednotka: "hod", cena: 2000, sazba: 21 },
+            { id: "p2026_6b", popis: "SEO optimalizace", mnozstvi: 20, jednotka: "hod", cena: 2000, sazba: 21 },
+            { id: "p2026_6c", popis: "Konzultace + strategie", mnozstvi: 41, jednotka: "hod", cena: 2000, sazba: 21 }
+          ]
+        },
+        
+        // 7. VYSTAVENÁ (nezaplacená) faktura - 50 000 Kč bez DPH - NEMĚLA BY SE POČÍTAT!
+        { id: "fak2026_7", cislo: "FV20260007", zakaznikId: "zak1", zakaznikNazev: "Acme s.r.o.", 
+          datumVystaveni: "2026-07-10", datumSplatnosti: "2026-07-24", datumUskutecneni: "2026-07-10", 
+          stav: "vystavena", poznamka: "Ještě nezaplaceno", 
+          polozky: [
+            { id: "p2026_7", popis: "Údržba a podpora", mnozstvi: 25, jednotka: "hod", cena: 2000, sazba: 21 }
+          ]
+        },
+        
+        // CELKEM ZAPLACENO 2026: 100k + 150k + 80k + 120k + 90k + 162k = 702 000 Kč ✅
+        // NEZAPLACENO: 50k (NEMĚLO BY SE POČÍTAT) ✅
+        // OČEKÁVANÝ PAUŠÁL 60%: 702 000 × 0.60 = 421 200 Kč ✅
     ],
     polozkyMaterialy: [],
     majetek: [],
@@ -346,11 +586,18 @@ function calcPojisteniNemovitosti(nemovitosti) {
 
 const calcRocniPrijmy = (faktury, nemovitosti, rok, metoda9) => {
     metoda9 = metoda9 || "pausal30"; // "pausal30" nebo "skutecne"
+    
     // §7 příjmy — jen zaplacené faktury (příjem vzniká při úhradě, ne vystavením)
-    const fakturyRoku = faktury.filter((f) => new Date(f.datumVystaveni).getFullYear() === rok && f.stav !== "storno");
-    const fakturaceZaplacene = fakturyRoku.filter(f => f.stav === "zaplacena");
+    // OPRAVA: správný stav je "stornována" ne "storno"
+    const fakturyRoku = faktury.filter((f) => 
+        new Date(f.datumVystaveni).getFullYear() === rok && 
+        f.stav !== "stornována"
+    );
+    
+    const fakturaceZaplacene = fakturyRoku.filter(f => f.stav === "uhrazena"); // OPRAVA: "uhrazena" ne "zaplacena"
     const fakturacePrijmy = fakturaceZaplacene.reduce((sum, f) => sum + calcFakturaTotal(f.polozky || []).zaklad, 0);
-    const fakturaceNezaplacene = fakturyRoku.filter(f => f.stav !== "zaplacena");
+    
+    const fakturaceNezaplacene = fakturyRoku.filter(f => f.stav === "vystavena"); // OPRAVA: explicitně jen "vystavena"
     const fakturacePrijmyNezapl = fakturaceNezaplacene.reduce((sum, f) => sum + calcFakturaTotal(f.polozky || []).zaklad, 0);
     const nemovitostPrijmy = (nemovitosti.properties || [])
         .reduce((sum, p) => { var _a, _b; return sum + ((((_a = p.income) === null || _a === void 0 ? void 0 : _a.rent) || 0) + (((_b = p.income) === null || _b === void 0 ? void 0 : _b.other) || 0)) * 12; }, 0);
@@ -1851,20 +2098,156 @@ function PrintModal({ html, title, onClose }) {
         React.createElement("iframe", { srcdoc: html, style: { flex: 1, border: "none", background: "#fff", width: "100%", height: "100%" } })
     );
 }
-const Card = ({ children, style, onClick }) => (React.createElement("div", { onClick: onClick, style: Object.assign(Object.assign({ background: "#fff", borderRadius: "10px", padding: "20px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)", border: "1px solid #e5e7eb" }, (onClick ? { cursor: "pointer" } : {})), style) }, children));
-const StatCard = ({ label, value, color, sub }) => (React.createElement(Card, { style: { textAlign: "center" } },
-    React.createElement("div", { style: { fontSize: "13px", color: "#6b7280", marginBottom: "6px" } }, label),
-    React.createElement("div", { style: { fontSize: "24px", fontWeight: "700", color: color || "#1a3a5c" } }, value),
-    sub && React.createElement("div", { style: { fontSize: "11px", color: "#9ca3af", marginTop: "4px" } }, sub)));
+const Card = ({ children, style, onClick }) => (React.createElement("div", { 
+    onClick: onClick, 
+    style: Object.assign({
+        background: "#ffffff",
+        borderRadius: "16px",
+        padding: "24px",
+        boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)",
+        border: "none",
+        transition: "all 0.3s ease"
+    }, onClick ? { 
+        cursor: "pointer",
+    } : {}, style)
+}, children));
+const StatCard = ({ label, value, color, sub, icon }) => {
+    const gradients = {
+        blue: 'linear-gradient(135deg, #d97706 0%, #b45309 100%)',
+        green: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+        orange: 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)',
+        red: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
+        purple: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+        cyan: 'linear-gradient(135deg, #0891b2 0%, #0e7490 100%)',
+        default: 'linear-gradient(135deg, #2d2622 0%, #1c1917 100%)'
+    };
+    
+    const getGradient = (colorName) => {
+        if (colorName === '#1a3a5c' || colorName === '#2d2622') return gradients.default;
+        if (colorName === '#16a34a' || colorName === '#10b981') return gradients.green;
+        if (colorName === '#d97706' || colorName === '#f59e0b') return gradients.orange;
+        if (colorName === '#dc2626' || colorName === '#ef4444') return gradients.red;
+        if (colorName === '#7c3aed' || colorName === '#8b5cf6') return gradients.purple;
+        if (colorName === '#0891b2' || colorName === '#06b6d4') return gradients.cyan;
+        if (colorName === '#3b82f6') return gradients.blue;
+        return gradients.blue;
+    };
+    
+    return React.createElement('div', { 
+        style: { 
+            background: getGradient(color),
+            borderRadius: '16px',
+            padding: '24px',
+            color: 'white',
+            boxShadow: '0 4px 6px -1px rgba(0,0,0,0.2), 0 2px 4px -1px rgba(0,0,0,0.1)',
+            position: 'relative',
+            overflow: 'hidden',
+            transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+            cursor: 'default'
+        },
+        onMouseEnter: (e) => {
+            e.currentTarget.style.transform = 'translateY(-4px)';
+            e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0,0,0,0.3), 0 4px 6px -2px rgba(0,0,0,0.2)';
+        },
+        onMouseLeave: (e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.2), 0 2px 4px -1px rgba(0,0,0,0.1)';
+        }
+    },
+        React.createElement('div', { 
+            style: { 
+                fontSize: '14px', 
+                opacity: 0.95, 
+                marginBottom: '12px',
+                fontWeight: '500',
+                letterSpacing: '0.3px',
+                textTransform: 'uppercase',
+                fontSize: '12px'
+            } 
+        }, label),
+        React.createElement('div', { 
+            style: { 
+                fontSize: '32px', 
+                fontWeight: '700',
+                marginBottom: '4px',
+                textShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            } 
+        }, value),
+        sub && React.createElement('div', { 
+            style: { 
+                fontSize: '13px', 
+                opacity: 0.9,
+                marginTop: '8px'
+            } 
+        }, sub),
+        React.createElement('div', {
+            style: {
+                position: 'absolute',
+                top: '-20px',
+                right: '-20px',
+                width: '100px',
+                height: '100px',
+                background: 'rgba(255,255,255,0.1)',
+                borderRadius: '50%',
+                pointerEvents: 'none'
+            }
+        }));
+};
 const Btn = ({ onClick, children, variant = "primary", small, disabled }) => {
     const styles = {
-        primary: { background: "#1a3a5c", color: "#fff" },
-        secondary: { background: "#e5e7eb", color: "#374151" },
-        danger: { background: "#dc2626", color: "#fff" },
-        success: { background: "#16a34a", color: "#fff" },
-        warning: { background: "#d97706", color: "#fff" },
+        primary: { 
+            background: "linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)",
+            color: "#fff",
+            boxShadow: "0 4px 6px -1px rgba(59, 130, 246, 0.4)"
+        },
+        secondary: { 
+            background: "#f3f4f6", 
+            color: "#374151",
+            boxShadow: "0 2px 4px -1px rgba(0,0,0,0.1)"
+        },
+        danger: { 
+            background: "linear-gradient(135deg, #EF4444 0%, #DC2626 100%)",
+            color: "#fff",
+            boxShadow: "0 4px 6px -1px rgba(239, 68, 68, 0.4)"
+        },
+        success: { 
+            background: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
+            color: "#fff",
+            boxShadow: "0 4px 6px -1px rgba(16, 185, 129, 0.4)"
+        },
+        warning: { 
+            background: "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)",
+            color: "#fff",
+            boxShadow: "0 4px 6px -1px rgba(245, 158, 11, 0.4)"
+        },
     };
-    return (React.createElement("button", { onClick: onClick, disabled: disabled, style: Object.assign(Object.assign({}, styles[variant]), { border: "none", borderRadius: "6px", padding: small ? "6px 12px" : "8px 16px", fontSize: small ? "12px" : "13px", cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.6 : 1, fontWeight: "500", transition: "opacity 0.2s" }) }, children));
+    return (React.createElement("button", { 
+        onClick: onClick, 
+        disabled: disabled, 
+        style: Object.assign({}, styles[variant], { 
+            border: "none", 
+            borderRadius: "8px", 
+            padding: small ? "6px 14px" : "10px 20px", 
+            fontSize: small ? "12px" : "14px", 
+            cursor: disabled ? "not-allowed" : "pointer", 
+            opacity: disabled ? 0.6 : 1, 
+            fontWeight: "600", 
+            transition: "all 0.2s ease",
+            letterSpacing: "0.3px"
+        }),
+        onMouseEnter: (e) => {
+            if (!disabled) {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.opacity = '0.9';
+            }
+        },
+        onMouseLeave: (e) => {
+            if (!disabled) {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.opacity = '1';
+            }
+        }
+    }, children));
 };
 const Input = ({ label, value, onChange, type = "text", required, placeholder, style }) => (React.createElement("div", { style: Object.assign({ marginBottom: "12px" }, style) },
     label && React.createElement("label", { style: { display: "block", fontSize: "12px", fontWeight: "600", color: "#374151", marginBottom: "4px" } },
@@ -2374,10 +2757,12 @@ function App() {
     const [activeSubTab, setActiveSubTab] = (0, useState)(null);
     const [modal, setModal] = (0, useState)(null);
     const [notification, setNotification] = (0, useState)(null);
+    
     const notify = (msg, type = "success") => {
         setNotification({ msg, type });
         setTimeout(() => setNotification(null), 3000);
     };
+    
     const updateData = (0, useCallback)((updater) => {
         setData(prev => {
             const next = typeof updater === "function" ? updater(prev) : Object.assign(Object.assign({}, prev), updater);
@@ -2386,16 +2771,17 @@ function App() {
         });
     }, []);
     const navItems = [
-        { id: "dashboard", label: "📊 Dashboard" },
-        { id: "fakturace", label: "🧾 Fakturace" },
-        { id: "zakaznici", label: "👥 Zákazníci" },
-        { id: "dph", label: "📋 DPH" },
-        { id: "dan", label: "💰 Daň z příjmu" },
-        { id: "prijate", label: "📥 Přijaté faktury" },
-        { id: "nemovitosti", label: "🏘️ Nemovitosti" },
-        { id: "najemnici", label: "🏠 Nájemníci" },
-        { id: "majetek", label: "🏭 Majetek" },
-        { id: "nastaveni", label: "⚙️ Nastavení" },
+        { id: "dashboard", label: "Dashboard", icon: "📊" },
+        { id: "fakturace", label: "Fakturace", icon: "🧾" },
+        { id: "payments", label: "Párování plateb", icon: "💳" },
+        { id: "zakaznici", label: "Zákazníci", icon: "👥" },
+        { id: "dph", label: "DPH", icon: "📋" },
+        { id: "dan", label: "Daň z příjmu", icon: "💰" },
+        { id: "prijate", label: "Přijaté faktury", icon: "📥" },
+        { id: "nemovitosti", label: "Nemovitosti", icon: "🏢" },
+        { id: "najemnici", label: "Nájemníci", icon: "🏠" },
+        { id: "majetek", label: "Majetek", icon: "📦" },
+        { id: "nastaveni", label: "Nastavení", icon: "⚙️" },
     ];
     // Detect mobile: screen width < 768px
     const [isMobile, setIsMobile] = (0, useState)(() => window.innerWidth < 768);
@@ -2408,18 +2794,20 @@ function App() {
     const navMobile = [
         { id: "dashboard", icon: "📊", label: "Přehled" },
         { id: "fakturace", icon: "🧾", label: "Faktury" },
+        { id: "payments", icon: "💳", label: "Platby" },
         { id: "zakaznici", icon: "👥", label: "Zákazníci" },
         { id: "dph", icon: "📋", label: "DPH" },
         { id: "dan", icon: "💰", label: "Daň" },
-        { id: "majetek", icon: "🏭", label: "Majetek" },
+        { id: "majetek", icon: "📦", label: "Majetek" },
         { id: "prijate", icon: "📥", label: "P.Fakt." },
-        { id: "nemovitosti", icon: "🏘️", label: "Reality" },
+        { id: "nemovitosti", icon: "🏢", label: "Reality" },
         { id: "najemnici", icon: "🏠", label: "Nájemn." },
         { id: "nastaveni", icon: "⚙️", label: "Nast." },
     ];
     const renderContent = () => (React.createElement(React.Fragment, null,
         activeTab === "dashboard" && React.createElement(Dashboard, { data: data }),
         activeTab === "fakturace" && React.createElement(Fakturace, { data: data, updateData: updateData, notify: notify, setModal: setModal }),
+        activeTab === "payments" && React.createElement(PaymentsPanel, { data: data, updateData: updateData, notify: notify }),
         activeTab === "zakaznici" && React.createElement(Zakaznici, { data: data, updateData: updateData, notify: notify }),
         activeTab === "dph" && React.createElement(DPHSection, { data: data }),
         activeTab === "dan" && React.createElement(DanZPrijmu, { data: data, updateData: updateData, notify: notify }),
@@ -2430,64 +2818,98 @@ function App() {
         activeTab === "nastaveni" && React.createElement(Nastaveni, { data: data, updateData: updateData, notify: notify })));
     // ── MOBILE LAYOUT ──────────────────────────────────────────
     if (isMobile) {
-        return (React.createElement("div", { style: { fontFamily: "'Segoe UI',system-ui,sans-serif", background: "#f0f4fa",
+        return (React.createElement("div", { style: { fontFamily: "'Segoe UI',system-ui,sans-serif", background: "#f5f3ef",
                 minHeight: "100vh", display: "flex", flexDirection: "column" } },
-            React.createElement("div", { style: { background: "#1a3a5c", padding: "10px 16px", display: "flex",
+            React.createElement("div", { style: { background: "#000000", padding: "10px 16px", display: "flex",
                     justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, zIndex: 200,
-                    boxShadow: "0 2px 8px rgba(0,0,0,0.2)" } },
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.5)" } },
                 React.createElement("div", null,
-                    React.createElement("div", { style: { color: "#fff", fontWeight: "700", fontSize: "16px" } }, "\uD83E\uDDEE Fakturace CZ"),
-                    React.createElement("div", { style: { color: "#60a5fa", fontSize: "11px" } }, data.firma.nazev || "Nastavte firmu")),
+                    React.createElement("div", { style: { color: "#fff", fontWeight: "700", fontSize: "16px" } }, "🧾 Fakturace CZ"),
+                    React.createElement("div", { style: { color: "#a0a0a0", fontSize: "11px" } }, data.firma.nazev || "Nastavte firmu")),
                 React.createElement("div", { style: { display: "flex", gap: "6px", alignItems: "center" } },
                     notification && (React.createElement("div", { style: { background: notification.type === "success" ? "#dcfce7" : "#fee2e2",
                             color: notification.type === "success" ? "#15803d" : "#dc2626",
                             padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: "600", maxWidth: "140px",
                             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, notification.msg)),
-                    React.createElement("button", { onClick: () => exportToFile(data), style: { background: "rgba(255,255,255,0.15)", border: "none", color: "#fff",
-                            borderRadius: "8px", padding: "6px 10px", fontSize: "12px", cursor: "pointer" } }, "\uD83D\uDCBE"),
+                    React.createElement("button", { onClick: () => exportToFile(data), style: { background: "rgba(255,255,255,0.1)", border: "none", color: "#fff",
+                            borderRadius: "8px", padding: "6px 10px", fontSize: "12px", cursor: "pointer" } }, "💾"),
                     React.createElement(MobileDriveBtn, { data: data, updateData: updateData, notify: notify }))),
             React.createElement("div", { style: { flex: 1, overflow: "auto", padding: "16px", paddingBottom: "80px" } }, renderContent()),
-            React.createElement("div", { style: { position: "fixed", bottom: 0, left: 0, right: 0, background: "#1a3a5c",
-                    display: "flex", zIndex: 200, borderTop: "1px solid rgba(255,255,255,0.1)",
-                    boxShadow: "0 -2px 12px rgba(0,0,0,0.3)" } }, navMobile.map(item => (React.createElement("button", { key: item.id, onClick: () => { setActiveTab(item.id); setActiveSubTab(null); }, style: { flex: 1, padding: "8px 2px", border: "none", background: "transparent",
-                    color: activeTab === item.id ? "#60a5fa" : "#94a3b8",
-                    fontSize: "9px", cursor: "pointer", display: "flex", flexDirection: "column",
-                    alignItems: "center", gap: "2px",
-                    borderTop: activeTab === item.id ? "2px solid #60a5fa" : "2px solid transparent" } },
-                React.createElement("span", { style: { fontSize: "16px" } }, item.icon),
+            React.createElement("div", { style: { position: "fixed", bottom: 0, left: 0, right: 0, background: "#000000",
+                    display: "flex", zIndex: 200, borderTop: "1px solid rgba(255,255,255,0.15)",
+                    boxShadow: "0 -2px 12px rgba(0,0,0,0.5)" } }, navMobile.map(item => (React.createElement("button", { 
+                    key: item.id, 
+                    onClick: () => { setActiveTab(item.id); setActiveSubTab(null); }, 
+                    style: { 
+                        flex: 1, 
+                        padding: "8px 2px", 
+                        border: "none", 
+                        background: "transparent",
+                        color: activeTab === item.id ? "#ffffff" : "#808080",
+                        fontSize: "9px", 
+                        cursor: "pointer", 
+                        display: "flex", 
+                        flexDirection: "column",
+                        alignItems: "center", 
+                        gap: "4px",
+                        borderTop: activeTab === item.id ? "2px solid #ffffff" : "2px solid transparent" 
+                    } 
+                },
+                React.createElement("span", { 
+                    style: { fontSize: "20px" }
+                }, item.icon),
                 React.createElement("span", { style: { fontWeight: activeTab === item.id ? "700" : "400", lineHeight: 1 } }, item.label)))))));
     }
+    
     // ── DESKTOP LAYOUT ─────────────────────────────────────────
-    return (React.createElement("div", { style: { fontFamily: "'Segoe UI',system-ui,sans-serif", background: "#f0f4fa", minHeight: "100vh", display: "flex" } },
-        React.createElement("div", { style: { width: "220px", background: "#1a3a5c", minHeight: "100vh", flexShrink: 0,
+    return (React.createElement("div", { style: { fontFamily: "'Segoe UI',system-ui,sans-serif", background: "#f5f3ef", minHeight: "100vh", display: "flex" } },
+        React.createElement("div", { style: { width: "220px", background: "#000000", minHeight: "100vh", flexShrink: 0,
                 display: "flex", flexDirection: "column" } },
-            React.createElement("div", { style: { padding: "20px 16px", borderBottom: "1px solid rgba(255,255,255,0.1)" } },
-                React.createElement("div", { style: { color: "#fff", fontWeight: "700", fontSize: "16px" } }, "\uD83E\uDDEE Fakturace CZ"),
-                React.createElement("div", { style: { color: "#60a5fa", fontSize: "11px", marginTop: "4px" } }, data.firma.nazev || "Nastavte firmu"),
-                React.createElement("div", { style: { color: "#94a3b8", fontSize: "10px", marginTop: "2px" } }, data.firma.dic)),
-            React.createElement("nav", { style: { flex: 1, padding: "10px 0" } }, navItems.map(item => (React.createElement("button", { key: item.id, onClick: () => { setActiveTab(item.id); setActiveSubTab(null); }, style: { width: "100%", padding: "11px 16px", border: "none", textAlign: "left",
-                    background: activeTab === item.id ? "rgba(255,255,255,0.12)" : "transparent",
-                    color: activeTab === item.id ? "#fff" : "#94a3b8",
-                    fontSize: "13px", cursor: "pointer",
-                    borderLeft: activeTab === item.id ? "3px solid #60a5fa" : "3px solid transparent",
+            React.createElement("div", { style: { padding: "20px 16px", borderBottom: "1px solid rgba(255,255,255,0.15)" } },
+                React.createElement("div", { style: { color: "#ffffff", fontWeight: "700", fontSize: "16px" } }, "🧾 Fakturace CZ"),
+                React.createElement("div", { style: { color: "#c4b5fd", fontSize: "11px", marginTop: "4px" } }, data.firma.nazev || "Nastavte firmu"),
+                React.createElement("div", { style: { color: "#a78bfa", fontSize: "10px", marginTop: "2px" } }, data.firma.dic)),
+            React.createElement("nav", { style: { flex: 1, padding: "10px 0" } }, navItems.map(item => (React.createElement("button", { 
+                key: item.id, 
+                onClick: () => { setActiveTab(item.id); setActiveSubTab(null); }, 
+                style: { 
+                    width: "100%", 
+                    padding: "11px 16px", 
+                    border: "none", 
+                    textAlign: "left",
+                    background: activeTab === item.id ? "rgba(255, 255, 255, 0.15)" : "transparent",
+                    color: activeTab === item.id ? "#ffffff" : "rgba(255, 255, 255, 0.7)",
+                    fontSize: "13px", 
+                    cursor: "pointer",
+                    borderLeft: activeTab === item.id ? "3px solid #c4b5fd" : "3px solid transparent",
                     fontWeight: activeTab === item.id ? "600" : "400",
-                    transition: "all 0.15s" } }, item.label)))),
-            React.createElement("div", { style: { padding: "16px", borderTop: "1px solid rgba(255,255,255,0.1)" } },
+                    transition: "all 0.15s",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px"
+                } 
+            }, 
+                React.createElement("span", { 
+                    style: { fontSize: "18px" }
+                }, item.icon),
+                item.label)))),
+            
+            React.createElement("div", { style: { padding: "16px", borderTop: "1px solid rgba(255,255,255,0.15)" } },
                 React.createElement("div", { style: { marginBottom: "8px" } },
                     React.createElement(GoogleDriveBtn, { data: data, updateData: updateData, notify: notify })),
                 React.createElement("div", { style: { display: "flex", gap: "6px" } },
-                    React.createElement("button", { onClick: () => exportToFile(data), style: { flex: 1, padding: "7px", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)",
-                            color: "#fff", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontWeight: "600" } }, "\uD83D\uDCBE Export"),
+                    React.createElement("button", { onClick: () => exportToFile(data), style: { flex: 1, padding: "7px", background: "rgba(255, 255, 255, 0.2)", border: "1px solid rgba(255, 255, 255, 0.3)",
+                            color: "#ffffff", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontWeight: "600" } }, "💾 Export"),
                     React.createElement("label", { style: { flex: 1 } },
-                        React.createElement("span", { style: { display: "block", padding: "7px", background: "rgba(255,255,255,0.1)",
-                                border: "1px solid rgba(255,255,255,0.2)", color: "#fff", borderRadius: "6px",
-                                fontSize: "11px", cursor: "pointer", fontWeight: "600", textAlign: "center" } }, "\uD83D\uDCC2 Import"),
+                        React.createElement("span", { style: { display: "block", padding: "7px", background: "rgba(255, 255, 255, 0.2)",
+                                border: "1px solid rgba(255, 255, 255, 0.3)", color: "#ffffff", borderRadius: "6px",
+                                fontSize: "11px", cursor: "pointer", fontWeight: "600", textAlign: "center" } }, "📂 Import"),
                         React.createElement("input", { type: "file", accept: ".json", style: { display: "none" }, onChange: e => importFromFile(e.target.files[0], (d) => { updateData(d); notify("Data obnovena!"); }) }))))),
         React.createElement("div", { style: { flex: 1, overflow: "auto" } },
-            React.createElement("div", { style: { background: "#fff", padding: "14px 28px", borderBottom: "1px solid #e5e7eb",
+            React.createElement("div", { style: { background: "#fff", padding: "14px 28px", borderBottom: "1px solid #e7e5e0",
                     display: "flex", justifyContent: "space-between", alignItems: "center",
-                    position: "sticky", top: 0, zIndex: 100, boxShadow: "0 1px 4px rgba(0,0,0,0.06)" } },
-                React.createElement("h1", { style: { margin: 0, fontSize: "20px", color: "#1a3a5c", fontWeight: "700" } }, ((_a = navItems.find(n => n.id === activeTab)) === null || _a === void 0 ? void 0 : _a.label) || "Dashboard"),
+                    position: "sticky", top: 0, zIndex: 100, boxShadow: "0 1px 3px rgba(0,0,0,0.04)" } },
+                React.createElement("h1", { style: { margin: 0, fontSize: "20px", color: "#2d2622", fontWeight: "700" } }, ((_a = navItems.find(n => n.id === activeTab)) === null || _a === void 0 ? void 0 : _a.label) || "Dashboard"),
                 React.createElement("div", { style: { display: "flex", gap: "8px", alignItems: "center" } }, notification && (React.createElement("div", { style: { background: notification.type === "success" ? "#dcfce7" : "#fee2e2",
                         color: notification.type === "success" ? "#15803d" : "#dc2626",
                         padding: "7px 14px", borderRadius: "8px", fontSize: "13px", fontWeight: "600" } }, notification.msg)))),
@@ -2499,21 +2921,127 @@ function App() {
 function Dashboard({ data }) {
     const rok = new Date().getFullYear();
     const mesic = new Date().getMonth() + 1;
-    const fakturyRok = data.faktury.filter(f => new Date(f.datumVystaveni).getFullYear() === rok && f.stav !== "storno");
+    const fakturyRok = data.faktury.filter(f => new Date(f.datumVystaveni).getFullYear() === rok && f.stav !== "stornována");
     const fakturyMesic = fakturyRok.filter(f => new Date(f.datumVystaveni).getMonth() + 1 === mesic);
     const poSplatnosti = data.faktury.filter(f => f.stav === "vystavena" && new Date(f.datumSplatnosti) < new Date());
     const sumRok = fakturyRok.reduce((s, f) => s + calcFakturaTotal(f.polozky || []).celkem, 0);
     const sumMesic = fakturyMesic.reduce((s, f) => s + calcFakturaTotal(f.polozky || []).celkem, 0);
     const sumNezaplaceno = data.faktury.filter(f => f.stav === "vystavena").reduce((s, f) => s + calcFakturaTotal(f.polozky || []).celkem, 0);
     const dphRok = calcDPHHlaseni(data.faktury, rok, Math.ceil(mesic / 3));
+    
+    // Payment stats
+    const platbyThisMonth = (data.platby || []).filter(p => {
+        const pDate = new Date(p.date);
+        return pDate.getMonth() + 1 === mesic && pDate.getFullYear() === rok;
+    });
+    const platbyInvoices = platbyThisMonth.filter(p => p.type === 'invoice');
+    const platbyRentals = platbyThisMonth.filter(p => p.type === 'rental');
+    const sumPlatbyMesic = platbyThisMonth.reduce((s, p) => s + (p.amount || 0), 0);
+    
     return (React.createElement("div", null,
         React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: "16px", marginBottom: "24px" } },
             React.createElement(StatCard, { label: `Obrat ${rok}`, value: formatCZK(sumRok), color: "#1a3a5c" }),
             React.createElement(StatCard, { label: `Fakturace tento měsíc`, value: formatCZK(sumMesic), color: "#16a34a" }),
+            React.createElement(StatCard, { label: `Přijaté platby (${mesic}/${rok})`, value: formatCZK(sumPlatbyMesic), color: "#0891b2" }),
             React.createElement(StatCard, { label: "Nezaplacen\u00E9 faktury", value: formatCZK(sumNezaplaceno), color: "#d97706" }),
             React.createElement(StatCard, { label: "Po splatnosti", value: poSplatnosti.length + " faktur", color: "#dc2626" }),
             React.createElement(StatCard, { label: `DPH k odvodu (Q${Math.ceil(mesic / 3)})`, value: formatCZK(dphRok.celkemOdvod), color: "#7c3aed" }),
             React.createElement(StatCard, { label: "Z\u00E1kazn\u00EDk\u016F", value: data.zakaznici.length, color: "#0891b2" })),
+        
+        React.createElement("div", { style: { marginBottom: "24px" } },
+            React.createElement(Card, null,
+                React.createElement("h3", { style: { marginTop: 0, marginBottom: "20px", color: "#1a3a5c" } }, "\uD83D\uDCCA P\u0159ehled faktur podle stavu"),
+                React.createElement("div", { style: { display: "flex", gap: "40px", alignItems: "center", flexWrap: "wrap" } },
+                    React.createElement("div", { style: { flex: "1 1 250px", display: "flex", justifyContent: "center" } },
+                        (function() {
+                            const uhrazene = data.faktury.filter(function(f) { return f.stav === "uhrazena"; });
+                            const vystavene = data.faktury.filter(function(f) { return f.stav === "vystavena"; });
+                            const poSplatn = data.faktury.filter(function(f) { return f.stav === "vystavena" && new Date(f.datumSplatnosti) < new Date(); });
+                            
+                            const sumUhrazene = uhrazene.reduce(function(s, f) { return s + calcFakturaTotal(f.polozky || []).celkem; }, 0);
+                            const sumVystavene = vystavene.reduce(function(s, f) { return s + calcFakturaTotal(f.polozky || []).celkem; }, 0);
+                            const sumPoSplatn = poSplatn.reduce(function(s, f) { return s + calcFakturaTotal(f.polozky || []).celkem; }, 0);
+                            
+                            const total = sumUhrazene + sumVystavene;
+                            const chartData = [
+                                { perc: total > 0 ? (sumUhrazene / total * 100) : 0, color: "#10b981" },
+                                { perc: total > 0 ? (sumPoSplatn / total * 100) : 0, color: "#dc2626" },
+                                { perc: total > 0 ? ((sumVystavene - sumPoSplatn) / total * 100) : 0, color: "#f59e0b" }
+                            ];
+                            
+                            let currentAngle = 0;
+                            const radius = 80;
+                            const cx = 100;
+                            const cy = 100;
+                            
+                            return React.createElement("svg", { width: "200", height: "200", viewBox: "0 0 200 200" },
+                                chartData.map(function(item, i) {
+                                    if (item.perc === 0) return null;
+                                    const startAngle = currentAngle;
+                                    const endAngle = currentAngle + (item.perc / 100 * 360);
+                                    currentAngle = endAngle;
+                                    
+                                    const startRad = (startAngle - 90) * Math.PI / 180;
+                                    const endRad = (endAngle - 90) * Math.PI / 180;
+                                    
+                                    const x1 = cx + radius * Math.cos(startRad);
+                                    const y1 = cy + radius * Math.sin(startRad);
+                                    const x2 = cx + radius * Math.cos(endRad);
+                                    const y2 = cy + radius * Math.sin(endRad);
+                                    
+                                    const largeArc = item.perc > 50 ? 1 : 0;
+                                    const pathData = "M " + cx + " " + cy + " L " + x1 + " " + y1 + " A " + radius + " " + radius + " 0 " + largeArc + " 1 " + x2 + " " + y2 + " Z";
+                                    
+                                    return React.createElement("path", {
+                                        key: i,
+                                        d: pathData,
+                                        fill: item.color,
+                                        stroke: "#fff",
+                                        strokeWidth: "2"
+                                    });
+                                }),
+                                React.createElement("circle", { cx: cx, cy: cy, r: "45", fill: "#fff" }),
+                                React.createElement("text", { x: cx, y: cy - 5, textAnchor: "middle", fontSize: "20", fontWeight: "700", fill: "#1a3a5c" }, data.faktury.filter(function(f) { return f.stav !== "stornována"; }).length),
+                                React.createElement("text", { x: cx, y: cy + 12, textAnchor: "middle", fontSize: "12", fill: "#6b7280" }, "faktur")
+                            );
+                        })()
+                    ),
+                    React.createElement("div", { style: { flex: "1 1 250px" } },
+                        (function() {
+                            const uhrazene = data.faktury.filter(function(f) { return f.stav === "uhrazena"; });
+                            const vystavene = data.faktury.filter(function(f) { return f.stav === "vystavena"; });
+                            const poSplatn = data.faktury.filter(function(f) { return f.stav === "vystavena" && new Date(f.datumSplatnosti) < new Date(); });
+                            
+                            const sumUhrazene = uhrazene.reduce(function(s, f) { return s + calcFakturaTotal(f.polozky || []).celkem; }, 0);
+                            const sumVystavene = vystavene.reduce(function(s, f) { return s + calcFakturaTotal(f.polozky || []).celkem; }, 0);
+                            const sumPoSplatn = poSplatn.reduce(function(s, f) { return s + calcFakturaTotal(f.polozky || []).celkem; }, 0);
+                            
+                            const legendData = [
+                                { label: "Uhrazen\u00E9", count: uhrazene.length, sum: sumUhrazene, color: "#10b981", icon: "\u2705" },
+                                { label: "Po splatnosti", count: poSplatn.length, sum: sumPoSplatn, color: "#dc2626", icon: "\u26A0\uFE0F" },
+                                { label: "Vystaven\u00E9", count: vystavene.length - poSplatn.length, sum: sumVystavene - sumPoSplatn, color: "#f59e0b", icon: "\u23F3" }
+                            ];
+                            
+                            return React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "12px" } },
+                                legendData.map(function(item, i) {
+                                    return React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: "10px" } },
+                                        React.createElement("div", { style: { width: "16px", height: "16px", borderRadius: "4px", background: item.color, flexShrink: 0 } }),
+                                        React.createElement("div", { style: { flex: 1 } },
+                                            React.createElement("div", { style: { fontSize: "13px", fontWeight: "600", color: "#374151", marginBottom: "2px" } },
+                                                item.icon + " " + item.label + " ",
+                                                React.createElement("span", { style: { marginLeft: "6px", fontSize: "12px", fontWeight: "400", color: "#6b7280" } }, "(" + item.count + "x)")
+                                            ),
+                                            React.createElement("div", { style: { fontSize: "16px", fontWeight: "700", color: item.color } }, formatCZK(item.sum))
+                                        )
+                                    );
+                                })
+                            );
+                        })()
+                    )
+                )
+            )
+        ),
+        
         React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" } },
             React.createElement(Card, null,
                 React.createElement("h3", { style: { marginTop: 0, color: "#1a3a5c" } }, "\u26A0\uFE0F Nezaplacen\u00E9 faktury"),
@@ -2687,7 +3215,7 @@ function Fakturace({ data, updateData, notify, setModal }) {
                                     React.createElement("option", { value: "uhrazena" }, "\u2705 Uhrazena"),
                                     React.createElement("option", { value: "po_splatnosti" }, "\u26A0\uFE0F Po splatnosti"),
                                     React.createElement("option", { value: "storno" }, "Storno")),
-                                f.stav !== "storno" && React.createElement(Btn, { onClick: () => deleteFaktura(f.id), variant: "danger", small: true }, "\uD83D\uDDD1")))));
+                                f.stav !== "stornována" && React.createElement(Btn, { onClick: () => deleteFaktura(f.id), variant: "danger", small: true }, "\uD83D\uDDD1")))));
                 }))),
             faktury.length === 0 && React.createElement("p", { style: { textAlign: "center", color: "#9ca3af", padding: "40px" } }, "\u017D\u00E1dn\u00E9 faktury")),
         showForm && editFaktura && (React.createElement(FakturaForm, { faktura: editFaktura, zakaznici: data.zakaznici, firma: data.firma, onSave: saveFaktura, onClose: () => { setShowForm(false); setEditFaktura(null); } })),
@@ -2860,7 +3388,7 @@ function Zakaznici({ data, updateData, notify }) {
             if (filterAktivni === "neaktivni") return z.aktivni === false;
             return true;
         }).map(z => {
-            const faktury = data.faktury.filter(f => f.zakaznikId === z.id && f.stav !== "storno");
+            const faktury = data.faktury.filter(f => f.zakaznikId === z.id && f.stav !== "stornována");
             const obrat = faktury.reduce((s, f) => s + calcFakturaTotal(f.polozky || []).celkem, 0);
             return (React.createElement(Card, { key: z.id },
                 React.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: "8px" } },
@@ -4487,7 +5015,7 @@ function RTNajemnici({ p, onUpdate, notify }) {
 
     return React.createElement("div", null,
         React.createElement("div", { style: { display: "flex", gap: "10px", marginBottom: "16px", flexWrap: "wrap" } },
-            React.createElement(Btn, { onClick: () => { setEditN({ id: generateId(), jmeno: "", telefon: "", email: "", nemovitostId: p.id, datumNastupu: getToday(), datumOdchodu: "", najem: 0, kauce: 0, meridla: [], poznamka: "" }); setShowForm(true); } }, "+ Přidat nájemníka"),
+            React.createElement(Btn, { onClick: () => { setEditN({ id: generateId(), jmeno: "", telefon: "", email: "", ucet: "", nemovitostId: p.id, datumNastupu: getToday(), datumOdchodu: "", najem: 0, kauce: 0, meridla: [], poznamka: "" }); setShowForm(true); } }, "+ Přidat nájemníka"),
             React.createElement(AIScanBtn, { label: "🤖 Ze smlouvy", prompt: "Extrahuj z najemni smlouvy: jmeno, telefon, email, datumNastupu (YYYY-MM-DD), datumOdchodu (YYYY-MM-DD nebo prazdne), najem (cislo Kc/mes), kauce (cislo Kc), poznamka. JSON.", onResult: r => { setEditN(Object.assign({ id: generateId(), meridla: [], nemovitostId: p.id }, r)); setShowForm(true); }, notify: notify })),
 
         aktivni.length > 0 && React.createElement("div", { style: { marginBottom: "20px" } },
@@ -4600,6 +5128,7 @@ function NajemnikForm({ n, onSave, onClose, properties }) {
         React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" } },
             React.createElement(Input, { label: "Telefon", value: f.telefon || "", onChange: v => set("telefon", v) }),
             React.createElement(Input, { label: "Email", type: "email", value: f.email || "", onChange: v => set("email", v) })),
+        React.createElement(Input, { label: "Číslo účtu (pro párování plateb)", value: f.ucet || "", onChange: v => set("ucet", v), placeholder: "123456789/0800" }),
         properties && React.createElement(Select, { label: "Nemovitost", value: f.nemovitostId || "", onChange: v => set("nemovitostId", v),
             options: [{ value: "", label: "— nevybráno —" }, ...(properties || []).map(p => ({ value: p.id, label: p.name }))] }),
         React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" } },
@@ -4665,7 +5194,7 @@ function NajemniciGlobal({ data, updateData, notify, setActiveTab }) {
 
         // Toolbar
         React.createElement("div", { style: { display: "flex", gap: "10px", marginBottom: "16px", flexWrap: "wrap", alignItems: "center" } },
-            React.createElement(Btn, { onClick: () => { setEditN({ id: generateId(), jmeno: "", telefon: "", email: "", nemovitostId: "", datumNastupu: getToday(), datumOdchodu: "", najem: 0, kauce: 0, meridla: [], poznamka: "" }); setShowForm(true); } }, "+ Nový nájemník"),
+            React.createElement(Btn, { onClick: () => { setEditN({ id: generateId(), jmeno: "", telefon: "", email: "", ucet: "", nemovitostId: "", datumNastupu: getToday(), datumOdchodu: "", najem: 0, kauce: 0, meridla: [], poznamka: "" }); setShowForm(true); } }, "+ Nový nájemník"),
             React.createElement(AIScanBtn, { label: "🤖 Ze smlouvy", prompt: "Extrahuj z najemni smlouvy: jmeno, telefon, email, datumNastupu (YYYY-MM-DD), datumOdchodu (YYYY-MM-DD nebo prazdne), najem (cislo), kauce (cislo), poznamka. JSON.", onResult: r => { setEditN(Object.assign({ id: generateId(), meridla: [], nemovitostId: "" }, r)); setShowForm(true); }, notify: notify }),
             React.createElement("div", { style: { display: "flex", gap: "6px", marginLeft: "auto" } },
                 ["aktivni", "historicky", "vse"].map(f => React.createElement("button", { key: f, onClick: () => setFilter(f), style: { padding: "6px 14px", borderRadius: "20px", border: "1px solid", cursor: "pointer", fontSize: "12px", fontWeight: "600",
@@ -5218,6 +5747,845 @@ function ConfirmDialog2Btn({ label, message, onConfirm }) {
             React.createElement(Btn, { onClick: () => setAsking(false), variant: "secondary" }, "Zru\u0161it")
         )
     );
+}
+
+// ============================================================
+// FIO BANK API FUNCTIONS
+// ============================================================
+async function fetchFioTransactions(token, dateFrom, dateTo) {
+  const url = `https://www.fio.cz/ib_api/rest/periods/${token}/${dateFrom}/${dateTo}/transactions.json`;
+  
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Fio API error: ' + response.status);
+    const data = await response.json();
+    
+    if (!data.accountStatement || !data.accountStatement.transactionList) {
+      return [];
+    }
+    
+    const transactions = data.accountStatement.transactionList.transaction || [];
+    return transactions.map(t => ({
+      id: t.column22?.value || generateId(),
+      date: t.column0?.value || '',
+      amount: t.column1?.value || 0,
+      currency: t.column14?.value || 'CZK',
+      account: t.column2?.value || '',
+      accountName: t.column10?.value || '',
+      variableSymbol: t.column5?.value || '',
+      constantSymbol: t.column4?.value || '',
+      specificSymbol: t.column6?.value || '',
+      message: t.column25?.value || '',
+      comment: t.column16?.value || '',
+      type: t.column8?.value || '',
+    }));
+  } catch (error) {
+    console.error('Fio API fetch error:', error);
+    throw error;
+  }
+}
+
+function parseFioCSV(csvText) {
+  const lines = csvText.split('\n').filter(l => l.trim());
+  const transactions = [];
+  
+  for (let i = 1; i < lines.length; i++) {
+    const parts = lines[i].split(';');
+    if (parts.length < 10) continue;
+    
+    transactions.push({
+      id: generateId(),
+      date: parts[0],
+      amount: parseFloat(parts[1].replace(',', '.').replace(/\s/g, '')) || 0,
+      currency: parts[2] || 'CZK',
+      account: parts[3] || '',
+      accountName: parts[4] || '',
+      variableSymbol: parts[5] || '',
+      constantSymbol: parts[6] || '',
+      specificSymbol: parts[7] || '',
+      message: parts[8] || '',
+      comment: parts[9] || '',
+      type: parts[10] || '',
+    });
+  }
+  
+  return transactions;
+}
+
+// ============================================================
+// GMAIL REMINDER SYSTEM
+// ============================================================
+
+// Calculate interest on overdue invoice
+function calculateInterest(amount, daysOverdue) {
+  const yearlyRate = 0.15; // 15% ročně
+  const dailyRate = yearlyRate / 365;
+  return Math.round(amount * dailyRate * daysOverdue * 100) / 100;
+}
+
+// Get reminder level for invoice
+function getInvoiceReminderLevel(invoice, upominky) {
+  // IMPORTANT: Check invoice status - respect ALL payment methods
+  // - Bank transfer (auto-matched from Fio/AI)
+  // - Manual status change (cash payment, card payment, etc.)
+  if (invoice.stav !== 'vystavena') {
+    return null; // Invoice is paid (uhrazena) or cancelled (stornována)
+  }
+  
+  const daysOverdue = Math.floor((new Date() - new Date(invoice.datumSplatnosti)) / (1000 * 60 * 60 * 24));
+  if (daysOverdue < 1) return null; // Not overdue yet
+  
+  const sentReminders = (upominky || []).filter(u => 
+    u.type === 'invoice' && u.invoiceId === invoice.id
+  ).sort((a, b) => new Date(b.date) - new Date(a.date));
+  
+  if (sentReminders.length === 0) {
+    return daysOverdue >= 7 ? 1 : null; // 1. upomínka po 7 dnech
+  }
+  
+  const lastReminder = sentReminders[0];
+  const daysSinceLastReminder = Math.floor((new Date() - new Date(lastReminder.date)) / (1000 * 60 * 60 * 24));
+  
+  if (lastReminder.level === 1 && daysSinceLastReminder >= 14) {
+    return 2; // 2. upomínka 14 dní po první
+  }
+  
+  if (lastReminder.level === 2 && daysSinceLastReminder >= 14) {
+    return 3; // Předžalobní výzva 14 dní po druhé
+  }
+  
+  return null;
+}
+
+// Get reminder level for rental
+function getRentalReminderLevel(najemnik, platby, upominky) {
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const currentDay = new Date().getDate();
+  
+  // Check if rent was paid this month
+  const paidThisMonth = (platby || []).some(p => 
+    p.type === 'rental' && p.rentalId === najemnik.id && p.month === currentMonth
+  );
+  
+  if (paidThisMonth) return null;
+  
+  const dueDay = najemnik.terminSplatnosti || 5;
+  const tolerance = najemnik.toleranceDni || 3;
+  const daysOverdue = currentDay - dueDay - tolerance;
+  
+  if (daysOverdue < 1) return null;
+  
+  // Check sent reminders
+  const sentReminders = (upominky || []).filter(u => 
+    u.type === 'rental' && u.rentalId === najemnik.id && u.month === currentMonth
+  ).sort((a, b) => new Date(b.date) - new Date(a.date));
+  
+  if (sentReminders.length === 0) {
+    return 1; // První upomínka
+  }
+  
+  const lastReminder = sentReminders[0];
+  const daysSinceLastReminder = Math.floor((new Date() - new Date(lastReminder.date)) / (1000 * 60 * 60 * 24));
+  
+  if (lastReminder.level === 1 && daysSinceLastReminder >= 7) {
+    return 2; // Druhá upomínka
+  }
+  
+  if (lastReminder.level === 2 && daysSinceLastReminder >= 14) {
+    return 3; // Upomínka před výpovědí
+  }
+  
+  return null;
+}
+
+// Substitute variables in email template
+function substituteEmailVariables(template, data) {
+  let result = template;
+  Object.keys(data).forEach(key => {
+    const placeholder = `{${key}}`;
+    result = result.split(placeholder).join(data[key] || '');
+  });
+  return result;
+}
+
+// Send Gmail reminder for invoice
+async function sendInvoiceReminder(invoice, level, firma, templates, notify) {
+  if (!invoice.zakaznikEmail) {
+    throw new Error('Zákazník nemá zadaný email');
+  }
+  
+  const daysOverdue = Math.floor((new Date() - new Date(invoice.datumSplatnosti)) / (1000 * 60 * 60 * 24));
+  const total = calcFakturaTotal(invoice.polozky || []).celkem;
+  const interest = calculateInterest(total, daysOverdue);
+  
+  const templateKey = level === 1 ? 'upominka1' : level === 2 ? 'upominka2' : 'upominka3';
+  const template = templates[templateKey];
+  
+  const lhuta = level === 1 ? 7 : level === 2 ? 10 : 7;
+  
+  const emailBody = substituteEmailVariables(template, {
+    CISLO_FAKTURY: invoice.cislo,
+    CASTKA: formatCZK(total),
+    DATUM_SPLATNOSTI: formatDate(invoice.datumSplatnosti),
+    LHUTA: lhuta,
+    UCET: firma.banka,
+    VS: invoice.cislo.replace(/\D/g, ''),
+    JMENO_FIRMY: firma.nazev,
+    EMAIL: firma.email,
+    TELEFON: firma.telefon,
+    ICO: firma.ico,
+    DATUM_UPOMINKY1: '', // TODO: get from history
+    UROK: '15',
+    UROK_CASTKA: formatCZK(interest),
+    CELKEM: formatCZK(total + interest + (level === 3 ? 1200 : 0))
+  });
+  
+  const subject = level === 1 
+    ? `Upomínka - Faktura č. ${invoice.cislo}`
+    : level === 2
+    ? `2. upomínka - Faktura č. ${invoice.cislo}`
+    : `PŘEDŽALOBNÍ VÝZVA - Faktura č. ${invoice.cislo}`;
+  
+  // TODO: Implement actual Gmail sending
+  // For now, just simulate
+  notify(`📧 Email odeslán: ${subject} → ${invoice.zakaznikEmail}`);
+  
+  return {
+    id: generateId(),
+    type: 'invoice',
+    invoiceId: invoice.id,
+    level: level,
+    date: getToday(),
+    email: invoice.zakaznikEmail,
+    subject: subject
+  };
+}
+
+// Send Gmail reminder for rental
+async function sendRentalReminder(najemnik, level, platby, firma, templates, notify) {
+  if (!najemnik.email) {
+    throw new Error('Nájemník nemá zadaný email');
+  }
+  
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const monthName = new Date(currentMonth + '-01').toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
+  
+  const templateKey = level === 1 ? 'upominka1' : level === 2 ? 'upominka2' : 'upominkaVypoved';
+  const template = templates[templateKey];
+  
+  // Get unpaid months for level 3
+  let mesiceDluhu = '';
+  if (level === 3) {
+    // TODO: Calculate all unpaid months
+    mesiceDluhu = `• ${monthName}: ${formatCZK(najemnik.najem)}`;
+  }
+  
+  const lhuta = level === 1 ? 7 : level === 2 ? 10 : 14;
+  const dueDay = najemnik.terminSplatnosti || 5;
+  
+  const emailBody = substituteEmailVariables(template, {
+    MESIC: monthName,
+    CASTKA: formatCZK(najemnik.najem),
+    DATUM_SPLATNOSTI: `${dueDay}. den v měsíci`,
+    LHUTA: lhuta,
+    UCET: firma.banka,
+    JMENO_PRONAJIMATEL: firma.nazev,
+    EMAIL: firma.email,
+    TELEFON: firma.telefon,
+    ICO: firma.ico,
+    DATUM_UPOMINKY1: '', // TODO: get from history
+    MESICE_DLUHU: mesiceDluhu
+  });
+  
+  const subject = level === 1 
+    ? `Upomínka - Nájemné ${monthName}`
+    : level === 2
+    ? `2. upomínka - Nájemné ${monthName}`
+    : `VÝZVA K ÚHRADĚ NÁJEMNÉHO - Možnost okamžité výpovědi`;
+  
+  notify(`📧 Email odeslán: ${subject} → ${najemnik.email}`);
+  
+  return {
+    id: generateId(),
+    type: 'rental',
+    rentalId: najemnik.id,
+    month: currentMonth,
+    level: level,
+    date: getToday(),
+    email: najemnik.email,
+    subject: subject
+  };
+}
+
+// ============================================================
+// AI BANK STATEMENT ANALYZER
+// ============================================================
+async function analyzeBankStatement(file) {
+  const base64 = await fileToBase64(file);
+  const mimeType = file.type || 'image/jpeg';
+  
+  const prompt = `Analyzuj tento bankovní výpis a extrahuj VŠECHNY příchozí platby (kladné částky).
+
+Pro každou transakci vrať JSON pole s těmito daty:
+- date: datum ve formátu YYYY-MM-DD (např. "2026-03-05")
+- amount: částka jako číslo (např. 22000, ne "22 000 Kč")
+- account: číslo účtu odesílatele (formát "123456789/0800", pokud není, dej "")
+- accountName: název plátce / odesílatele
+- variableSymbol: variabilní symbol (pokud není, dej "")
+- constantSymbol: konstantní symbol (pokud není, dej "")
+- specificSymbol: specifický symbol (pokud není, dej "")
+- message: zpráva pro příjemce / poznámka
+- comment: jakýkoliv komentář k platbě
+
+DŮLEŽITÉ:
+- Zahrnuj POUZE příchozí platby (příjmy), ne odchozí platby (výdaje)
+- Částka musí být číslo bez mezer a bez měny
+- Datum MUSÍ být ve formátu YYYY-MM-DD
+- Pokud pole chybí, dej prázdný řetězec ""
+
+Vrať POUZE JSON bez jakéhokoliv dalšího textu:
+{
+  "transactions": [
+    {
+      "date": "2026-03-05",
+      "amount": 22000,
+      "account": "123456789/0800",
+      "accountName": "Jan Novák",
+      "variableSymbol": "20250042",
+      "constantSymbol": "",
+      "specificSymbol": "",
+      "message": "Nájem březen 2026",
+      "comment": ""
+    }
+  ]
+}`;
+
+  try {
+    const result = await callGemini(prompt, base64, mimeType);
+    
+    // Validate and normalize transactions
+    if (!result.transactions || !Array.isArray(result.transactions)) {
+      throw new Error('AI nevrátilo pole transakcí');
+    }
+    
+    return result.transactions.map(t => ({
+      id: generateId(),
+      date: t.date || '',
+      amount: parseFloat(t.amount) || 0,
+      currency: 'CZK',
+      account: t.account || '',
+      accountName: t.accountName || '',
+      variableSymbol: t.variableSymbol || '',
+      constantSymbol: t.constantSymbol || '',
+      specificSymbol: t.specificSymbol || '',
+      message: t.message || '',
+      comment: t.comment || '',
+      type: 'AI-analyzed',
+    }));
+  } catch (error) {
+    console.error('AI analysis error:', error);
+    throw new Error('Chyba při AI analýze: ' + error.message);
+  }
+}
+
+function matchPaymentToInvoiceOrRent(payment, invoices, rentals) {
+  const matches = [];
+  
+  // 1. Match to INVOICE by Variable Symbol
+  if (payment.variableSymbol) {
+    const invoice = invoices.find(inv => {
+      if (!inv.cislo) return false;
+      const invNum = inv.cislo.replace(/\D/g, '');
+      const payVS = payment.variableSymbol.replace(/\D/g, '');
+      return invNum === payVS;
+    });
+    
+    if (invoice) {
+      const total = calcFakturaTotal(invoice.polozky || []).celkem;
+      const confidence = Math.abs(payment.amount - total) < 1 ? 100 : 85;
+      
+      matches.push({
+        type: 'invoice',
+        id: invoice.id,
+        cislo: invoice.cislo,
+        zakaznik: invoice.zakaznikNazev,
+        amount: total,
+        confidence,
+        reason: 'Variabilní symbol = číslo faktury'
+      });
+    }
+  }
+  
+  // 2. Match to RENTAL by account + amount
+  for (const rental of rentals) {
+    if (!rental.ucet) continue;
+    
+    const accountMatch = payment.account.includes(rental.ucet) || 
+                        rental.ucet.includes(payment.account);
+    const amountMatch = Math.abs(payment.amount - (rental.najem || 0)) < 1;
+    
+    if (accountMatch && amountMatch) {
+      matches.push({
+        type: 'rental',
+        id: rental.id,
+        jmeno: rental.jmeno,
+        amount: rental.najem,
+        confidence: 95,
+        reason: 'Číslo účtu + částka nájmu'
+      });
+    } else if (accountMatch) {
+      matches.push({
+        type: 'rental',
+        id: rental.id,
+        jmeno: rental.jmeno,
+        amount: rental.najem,
+        confidence: 60,
+        reason: 'Pouze číslo účtu'
+      });
+    }
+  }
+  
+  // 3. Fuzzy match by amount only
+  if (matches.length === 0) {
+    for (const invoice of invoices.filter(inv => inv.stav !== 'uhrazena')) {
+      const total = calcFakturaTotal(invoice.polozky || []).celkem;
+      if (Math.abs(payment.amount - total) < 1) {
+        matches.push({
+          type: 'invoice',
+          id: invoice.id,
+          cislo: invoice.cislo,
+          zakaznik: invoice.zakaznikNazev,
+          amount: total,
+          confidence: 40,
+          reason: 'Pouze částka'
+        });
+      }
+    }
+  }
+  
+  matches.sort((a, b) => b.confidence - a.confidence);
+  return matches.length > 0 ? matches[0] : null;
+}
+
+// ============================================================
+// PAYMENTS PANEL - Párování plateb z Fio
+// ============================================================
+function PaymentsPanel({ data, updateData, notify }) {
+  const [fioToken, setFioToken] = useState(data.fioToken || '');
+  const [dateFrom, setDateFrom] = useState(addDays(getToday(), -30));
+  const [dateTo, setDateTo] = useState(getToday());
+  const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [matchedPayments, setMatchedPayments] = useState({});
+  const fileInputRef = useRef(null);
+  const aiInputRef = useRef(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  
+  async function loadTransactions() {
+    if (!fioToken) {
+      notify('⚠️ Nejdříve zadejte Fio API token', 'error');
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const trans = await fetchFioTransactions(
+        fioToken, 
+        dateFrom.replace(/-/g, '.'), 
+        dateTo.replace(/-/g, '.')
+      );
+      
+      setTransactions(trans);
+      autoMatchPayments(trans);
+      notify(`✅ Načteno ${trans.length} transakcí z Fio API`);
+    } catch (error) {
+      notify('❌ Chyba při načítání z Fio API: ' + error.message, 'error');
+    }
+    setLoading(false);
+  }
+  
+  function handleCSVUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const trans = parseFioCSV(event.target.result);
+        setTransactions(trans);
+        autoMatchPayments(trans);
+        notify(`✅ Načteno ${trans.length} transakcí z CSV`);
+      } catch (error) {
+        notify('❌ Chyba při parsování CSV: ' + error.message, 'error');
+      }
+    };
+    reader.readAsText(file, 'windows-1250');
+  }
+  
+  async function handleAIAnalysis(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    setAiLoading(true);
+    notify('🤖 AI analyzuje výpis...', 'info');
+    
+    try {
+      const trans = await analyzeBankStatement(file);
+      setTransactions(trans);
+      autoMatchPayments(trans);
+      notify(`✅ AI našla ${trans.length} příchozích plateb!`);
+    } catch (error) {
+      notify('❌ ' + error.message, 'error');
+    }
+    
+    setAiLoading(false);
+    e.target.value = ''; // Reset input
+  }
+  
+  function autoMatchPayments(trans) {
+    const matched = {};
+    trans.forEach(payment => {
+      if (payment.amount > 0) {
+        const match = matchPaymentToInvoiceOrRent(
+          payment, 
+          data.faktury || [], 
+          data.najemnici || []
+        );
+        if (match) {
+          matched[payment.id] = match;
+        }
+      }
+    });
+    setMatchedPayments(matched);
+  }
+  
+  function confirmPayment(payment, match) {
+    if (!match) return;
+    
+    if (match.type === 'invoice') {
+      updateData(prev => ({
+        ...prev,
+        faktury: prev.faktury.map(inv => 
+          inv.id === match.id 
+            ? { ...inv, stav: 'uhrazena', datumUhrady: payment.date }
+            : inv
+        ),
+        platby: [...(prev.platby || []), {
+          id: payment.id,
+          type: 'invoice',
+          invoiceId: match.id,
+          amount: payment.amount,
+          date: payment.date,
+          matched: true
+        }]
+      }));
+      
+      notify(`✅ Faktura ${match.cislo} označena jako uhrazená`);
+    } else if (match.type === 'rental') {
+      const month = new Date(payment.date).toISOString().slice(0, 7);
+      
+      updateData(prev => ({
+        ...prev,
+        platby: [...(prev.platby || []), {
+          id: payment.id,
+          type: 'rental',
+          rentalId: match.id,
+          amount: payment.amount,
+          date: payment.date,
+          month: month,
+          matched: true
+        }]
+      }));
+      
+      notify(`✅ Nájem pro ${match.jmeno} (${month}) označen jako zaplacený`);
+    }
+    
+    setTransactions(prev => prev.filter(t => t.id !== payment.id));
+  }
+  
+  const saveFioToken = () => {
+    updateData(prev => ({ ...prev, fioToken }));
+    notify('✅ Fio token uložen');
+  };
+  
+  const incomingPayments = transactions.filter(t => t.amount > 0);
+  const unmatchedCount = incomingPayments.filter(p => !matchedPayments[p.id] || matchedPayments[p.id].confidence < 80).length;
+  
+  return React.createElement('div', null,
+    React.createElement('h2', { style: { marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px' } },
+      React.createElement('span', null, '💳'),
+      React.createElement('span', null, 'Párování plateb z Fio banky'),
+      unmatchedCount > 0 && React.createElement('span', { 
+        style: { 
+          background: '#fef3c7', 
+          color: '#92400e', 
+          padding: '4px 12px', 
+          borderRadius: '12px', 
+          fontSize: '13px',
+          fontWeight: '600'
+        } 
+      }, `${unmatchedCount} nespárovaných`)
+    ),
+    
+    // Fio Token Input
+    React.createElement(Card, { style: { marginBottom: '24px', background: '#f0fdf4', border: '1px solid #86efac' } },
+      React.createElement('h3', { style: { marginTop: 0, color: '#15803d' } }, '🔑 Fio API Token'),
+      React.createElement('p', { style: { fontSize: '13px', color: '#6b7280', marginBottom: '12px', lineHeight: '1.6' } },
+        'Token získáte v internetovém bankovnictví Fio (Nastavení → API → Nový token). ',
+        'Token umožňuje pouze čtení transakcí - žádné platby odeslat nelze.'
+      ),
+      React.createElement('div', { style: { display: 'flex', gap: '8px', marginBottom: '8px' } },
+        React.createElement('input', {
+          type: 'password',
+          value: fioToken,
+          onChange: e => setFioToken(e.target.value),
+          placeholder: 'Vložte Fio API token...',
+          style: { 
+            flex: 1, 
+            padding: '10px 12px', 
+            border: '1px solid #d1d5db', 
+            borderRadius: '6px', 
+            fontSize: '14px',
+            fontFamily: 'monospace'
+          }
+        }),
+        React.createElement(Btn, { onClick: saveFioToken }, '💾 Uložit')
+      ),
+      fioToken && React.createElement('div', { style: { fontSize: '12px', color: '#15803d', marginTop: '8px' } },
+        '✅ Token je uložen lokálně v prohlížeči'
+      )
+    ),
+    
+    // Date Range & Load
+    React.createElement(Card, { style: { marginBottom: '24px' } },
+      React.createElement('h3', { style: { marginTop: 0 } }, '📅 Načíst transakce z Fio API'),
+      React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '12px', marginBottom: '12px' } },
+        React.createElement('div', null,
+          React.createElement('label', { style: { display: 'block', fontSize: '12px', marginBottom: '4px', color: '#6b7280' } }, 'Od data'),
+          React.createElement('input', {
+            type: 'date',
+            value: dateFrom,
+            onChange: e => setDateFrom(e.target.value),
+            style: { width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '6px' }
+          })
+        ),
+        React.createElement('div', null,
+          React.createElement('label', { style: { display: 'block', fontSize: '12px', marginBottom: '4px', color: '#6b7280' } }, 'Do data'),
+          React.createElement('input', {
+            type: 'date',
+            value: dateTo,
+            onChange: e => setDateTo(e.target.value),
+            style: { width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '6px' }
+          })
+        ),
+        React.createElement('div', { style: { display: 'flex', alignItems: 'flex-end' } },
+          React.createElement(Btn, { onClick: loadTransactions, disabled: loading },
+            loading ? '⏳ Načítám...' : '🔄 Načíst'
+          )
+        )
+      ),
+      
+      React.createElement('div', { style: { borderTop: '1px solid #e5e7eb', paddingTop: '12px', marginTop: '12px' } },
+        React.createElement('p', { style: { fontSize: '13px', color: '#6b7280', marginBottom: '8px' } },
+          'Nebo nahrajte CSV výpis z Fio banky:'
+        ),
+        React.createElement('input', {
+          ref: fileInputRef,
+          type: 'file',
+          accept: '.csv',
+          onChange: handleCSVUpload,
+          style: { fontSize: '13px' }
+        })
+      )
+    ),
+    
+    // AI Analysis Card
+    React.createElement(Card, { style: { marginBottom: '24px', background: '#fefce8', border: '2px solid #fde047' } },
+      React.createElement('h3', { style: { marginTop: 0, color: '#854d0e', display: 'flex', alignItems: 'center', gap: '8px' } }, 
+        React.createElement('span', null, '🤖'),
+        React.createElement('span', null, 'AI Analýza výpisu (jakákoliv banka)')
+      ),
+      React.createElement('p', { style: { fontSize: '13px', color: '#6b7280', marginBottom: '12px', lineHeight: '1.6' } },
+        'Nahrajte výpis z ', React.createElement('strong', null, 'KB, ČSOB, Air Bank, Raiffeisenbank'),
+        ' nebo jiné banky. AI automaticky extrahuje všechny platby.'
+      ),
+      React.createElement('div', { style: { 
+        background: '#fffbeb', 
+        border: '1px solid #fcd34d',
+        borderRadius: '6px',
+        padding: '10px 12px',
+        marginBottom: '12px',
+        fontSize: '12px',
+        color: '#78350f',
+        lineHeight: '1.6'
+      } },
+        React.createElement('div', { style: { fontWeight: '600', marginBottom: '4px' } }, '💡 Podporované formáty:'),
+        React.createElement('div', null, '• PDF výpis z internetového bankovnictví'),
+        React.createElement('div', null, '• Screenshot / foto výpisu (PNG, JPG)'),
+        React.createElement('div', null, '• Mobilní výpis (z bankovní aplikace)')
+      ),
+      React.createElement('div', { style: { display: 'flex', gap: '12px', alignItems: 'center' } },
+        React.createElement('input', {
+          ref: aiInputRef,
+          type: 'file',
+          accept: '.pdf,.png,.jpg,.jpeg',
+          onChange: handleAIAnalysis,
+          disabled: aiLoading,
+          style: { 
+            flex: 1,
+            fontSize: '13px',
+            padding: '8px',
+            border: '1px solid #fcd34d',
+            borderRadius: '6px',
+            background: 'white'
+          }
+        }),
+        React.createElement('button', {
+          onClick: () => aiInputRef.current?.click(),
+          disabled: aiLoading,
+          style: {
+            padding: '10px 20px',
+            background: aiLoading ? '#9ca3af' : '#7c3aed',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            fontSize: '14px',
+            fontWeight: '600',
+            cursor: aiLoading ? 'not-allowed' : 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }
+        },
+          aiLoading ? '⏳ Analyzuji...' : '🤖 Analyzovat'
+        )
+      ),
+      !getGeminiKey() && React.createElement('div', { 
+        style: { 
+          marginTop: '12px',
+          padding: '10px 12px',
+          background: '#fef3c7',
+          border: '1px solid #fcd34d',
+          borderRadius: '6px',
+          fontSize: '12px',
+          color: '#92400e'
+        } 
+      },
+        '⚠️ Pro AI analýzu je potřeba Gemini API klíč. Nastavte ho v záložce ',
+        React.createElement('strong', null, 'Nastavení'),
+        '.'
+      )
+    ),
+    
+    // Transactions List
+    incomingPayments.length > 0 && React.createElement(Card, null,
+      React.createElement('h3', { style: { marginTop: 0, marginBottom: '16px' } }, 
+        `📋 Nalezeno ${incomingPayments.length} příchozích plateb`
+      ),
+      
+      incomingPayments.map(payment => {
+        const match = matchedPayments[payment.id];
+        
+        return React.createElement('div', {
+          key: payment.id,
+          style: { 
+            background: match ? '#f0fdf4' : 'white',
+            border: match ? '2px solid #86efac' : '1px solid #e5e7eb',
+            borderRadius: '8px',
+            padding: '16px',
+            marginBottom: '12px'
+          }
+        },
+          React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '8px' } },
+            React.createElement('div', null,
+              React.createElement('div', { style: { fontSize: '18px', fontWeight: '700', marginBottom: '4px', color: '#15803d' } },
+                formatCZK(payment.amount)
+              ),
+              React.createElement('div', { style: { fontSize: '13px', color: '#6b7280' } },
+                formatDate(payment.date), ' • ', payment.accountName || payment.account
+              )
+            ),
+            match && React.createElement('span', { 
+              style: { 
+                background: match.confidence >= 90 ? '#d1fae5' : '#fef3c7',
+                color: match.confidence >= 90 ? '#065f46' : '#92400e',
+                padding: '4px 12px',
+                borderRadius: '12px',
+                fontSize: '11px',
+                fontWeight: '600'
+              } 
+            }, 
+              match.confidence >= 90 ? '✓ Automaticky' : '? Návrh (' + match.confidence + '%)'
+            )
+          ),
+          
+          payment.variableSymbol && React.createElement('div', { style: { fontSize: '12px', color: '#6b7280', marginBottom: '4px' } },
+            'VS: ', payment.variableSymbol
+          ),
+          
+          payment.message && React.createElement('div', { style: { fontSize: '12px', color: '#6b7280', marginBottom: '4px' } },
+            'Zpráva: ', payment.message
+          ),
+          
+          match ? React.createElement('div', { 
+            style: { 
+              background: '#ecfdf5', 
+              padding: '12px', 
+              borderRadius: '6px', 
+              marginTop: '8px',
+              border: '1px solid #86efac'
+            } 
+          },
+            React.createElement('div', { style: { fontSize: '13px', fontWeight: '600', color: '#15803d', marginBottom: '4px' } },
+              match.type === 'invoice' 
+                ? `📄 Faktura ${match.cislo} - ${match.zakaznik}`
+                : `🏘️ Nájem - ${match.jmeno}`
+            ),
+            React.createElement('div', { style: { fontSize: '12px', color: '#166534', marginBottom: '8px' } },
+              match.reason
+            ),
+            React.createElement('div', { style: { display: 'flex', gap: '8px' } },
+              React.createElement(Btn, { 
+                onClick: () => confirmPayment(payment, match),
+                style: { fontSize: '12px', padding: '6px 12px' }
+              }, '✓ Potvrdit párování'),
+              React.createElement(Btn, { 
+                onClick: () => setMatchedPayments(prev => {
+                  const newMatched = {...prev};
+                  delete newMatched[payment.id];
+                  return newMatched;
+                }),
+                style: { fontSize: '12px', padding: '6px 12px', background: '#6b7280' }
+              }, '✗ Odmítnout')
+            )
+          ) : React.createElement('div', { 
+            style: { 
+              background: '#fef3c7', 
+              padding: '12px', 
+              borderRadius: '6px', 
+              marginTop: '8px',
+              fontSize: '12px',
+              color: '#92400e'
+            } 
+          },
+            '⚠️ Nepodařilo se automaticky spárovat. Zkontrolujte faktury a nájemníky ručně.'
+          )
+        );
+      })
+    ),
+    
+    transactions.length === 0 && React.createElement(Card, { style: { textAlign: 'center', padding: '40px' } },
+      React.createElement('div', { style: { fontSize: '48px', marginBottom: '16px', opacity: 0.5 } }, '💳'),
+      React.createElement('p', { style: { color: '#6b7280', marginBottom: '8px' } }, 
+        'Zatím nejsou načteny žádné transakce.'
+      ),
+      React.createElement('p', { style: { fontSize: '13px', color: '#9ca3af' } },
+        'Použijte Fio API, CSV výpis, nebo ',
+        React.createElement('strong', { style: { color: '#7c3aed' } }, '🤖 AI analýzu'),
+        ' pro výpisy z jakékoliv banky.'
+      )
+    )
+  );
 }
 
 function Nastaveni({ data, updateData, notify }) {
