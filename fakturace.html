@@ -2411,6 +2411,7 @@ async function loadFromDrive() {
 
 // ── Gemini API klíč z Google Drive ──────────────────────────
 const GEMINI_KEY_FILE = "gemini_key.txt";
+const FIO_TOKEN_FILE = "fio_token.txt";
 
 async function loadGeminiKeyFromDrive() {
     try {
@@ -2470,6 +2471,70 @@ async function saveGeminiKeyToDrive(key) {
         return true;
     } catch(e) {
         console.log("Gemini key save to Drive failed:", e);
+        return false;
+    }
+}
+
+// ============================================================
+// FIO TOKEN - Load/Save from Google Drive
+// ============================================================
+async function loadFioTokenFromDrive() {
+    try {
+        const token = window.gapi.client.getToken().access_token;
+        const resp = await fetch(
+            `https://www.googleapis.com/drive/v3/files?q=name='${FIO_TOKEN_FILE}' and trashed=false&spaces=drive&fields=files(id,name)`,
+            { headers: { "Authorization": "Bearer " + token } }
+        );
+        const data = await resp.json();
+        if (!data.files || data.files.length === 0) return null;
+        const fileId = data.files[0].id;
+        const content = await fetch(
+            `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+            { headers: { "Authorization": "Bearer " + token } }
+        );
+        const fioToken = (await content.text()).trim();
+        if (fioToken && fioToken.length > 20) {
+            return fioToken;
+        }
+        return null;
+    } catch(e) {
+        console.log("Fio token load from Drive failed:", e);
+        return null;
+    }
+}
+
+async function saveFioTokenToDrive(fioToken) {
+    try {
+        const token = window.gapi.client.getToken().access_token;
+        const blob = new Blob([fioToken], { type: "text/plain" });
+        // Zkontroluj jestli soubor existuje
+        const resp = await fetch(
+            `https://www.googleapis.com/drive/v3/files?q=name='${FIO_TOKEN_FILE}' and trashed=false&spaces=drive&fields=files(id)`,
+            { headers: { "Authorization": "Bearer " + token } }
+        );
+        const data = await resp.json();
+        if (data.files && data.files.length > 0) {
+            // Aktualizuj existující
+            await fetch(`https://www.googleapis.com/upload/drive/v3/files/${data.files[0].id}?uploadType=media`, {
+                method: "PATCH",
+                headers: { "Authorization": "Bearer " + token, "Content-Type": "text/plain" },
+                body: fioToken,
+            });
+        } else {
+            // Vytvoř nový
+            const meta = { name: FIO_TOKEN_FILE, mimeType: "text/plain" };
+            const form = new FormData();
+            form.append("metadata", new Blob([JSON.stringify(meta)], { type: "application/json" }));
+            form.append("file", blob);
+            await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
+                method: "POST",
+                headers: { "Authorization": "Bearer " + token },
+                body: form,
+            });
+        }
+        return true;
+    } catch(e) {
+        console.log("Fio token save to Drive failed:", e);
         return false;
     }
 }
@@ -2655,6 +2720,12 @@ function GoogleDriveBtn({ data, updateData, notify }) {
                                 // Načíst Gemini klíč z Drive
                                 const gKey = await loadGeminiKeyFromDrive();
                                 if (gKey) notify("🤖 Gemini API klíč načten z Drive!");
+                                // Načíst Fio token z Drive
+                                const fToken = await loadFioTokenFromDrive();
+                                if (fToken) {
+                                    updateData(prev => ({ ...prev, fioToken: fToken }));
+                                    notify("🏦 Fio API token načten z Drive!");
+                                }
                                 // Týdenní záloha při připojení
                                 await createWeeklyBackupIfNeeded(data);
                                 setStatus("connected");
@@ -6303,9 +6374,21 @@ function PaymentsPanel({ data, updateData, notify }) {
     setTransactions(prev => prev.filter(t => t.id !== payment.id));
   }
   
-  const saveFioToken = () => {
+  const saveFioToken = async () => {
     updateData(prev => ({ ...prev, fioToken }));
     notify('✅ Fio token uložen');
+    
+    // Zkus uložit také na Google Drive pokud je připojeno
+    try {
+      if (window.gapi && window.gapi.client && window.gapi.client.getToken()) {
+        const saved = await saveFioTokenToDrive(fioToken);
+        if (saved) {
+          notify('🏦 Fio token také uložen na Google Drive!');
+        }
+      }
+    } catch(e) {
+      console.log('Fio token Google Drive save skipped:', e);
+    }
   };
   
   const incomingPayments = transactions.filter(t => t.amount > 0);
