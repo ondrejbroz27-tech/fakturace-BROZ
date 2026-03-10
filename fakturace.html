@@ -3249,18 +3249,31 @@ function Dashboard({ data }) {
                                 React.createElement("div", { style: { fontWeight: "700", color: overdue ? "#dc2626" : "#374151" } }, formatCZK(total.celkem)),
                                 overdue && React.createElement(Badge, { text: "Po splatnosti", color: "red" })),
                             overdue && hasEmail && React.createElement("button", { 
-                                onClick: async function() {
+                                onClick: function(e) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    
+                                    console.log('🔵 Tlačítko kliknuto!', f.cislo);
+                                    console.log('🔍 isGmailConnected:', isGmailConnected());
+                                    
                                     if (!isGmailConnected()) {
+                                        console.log('❌ Gmail není připojen');
                                         notify("\u274C Nejprve p\u0159ipojte Google Drive (zahrnuje Gmail)");
                                         return;
                                     }
-                                    try {
-                                        notify("\uD83D\uDCE7 Odes\u00EDl\u00E1m upom\u00EDnku...");
-                                        await sendInvoiceReminder(f, 1, data.firma, data.emailSablonyFaktury, notify);
-                                        notify("\u2705 Upom\u00EDnka odesl\u00E1na!");
-                                    } catch (error) {
-                                        notify("\u274C Chyba: " + error.message);
-                                    }
+                                    
+                                    console.log('✅ Gmail připojen, odesílám...');
+                                    
+                                    (async function() {
+                                        try {
+                                            notify("\uD83D\uDCE7 Odes\u00EDl\u00E1m upom\u00EDnku...");
+                                            await sendInvoiceReminder(f, 1, data.firma, data.emailSablonyFaktury, notify);
+                                            notify("\u2705 Upom\u00EDnka odesl\u00E1na!");
+                                        } catch (error) {
+                                            console.error('❌ Chyba při odesílání:', error);
+                                            notify("\u274C Chyba: " + error.message);
+                                        }
+                                    })();
                                 },
                                 style: { 
                                     background: "#3b82f6", 
@@ -3271,8 +3284,11 @@ function Dashboard({ data }) {
                                     fontSize: "11px", 
                                     cursor: "pointer",
                                     fontWeight: "600",
-                                    whiteSpace: "nowrap"
+                                    whiteSpace: "nowrap",
+                                    position: "relative",
+                                    zIndex: 10
                                 },
+                                type: "button",
                                 title: "Odeslat 1. upom\u00EDnku na email: " + f.zakaznikEmail
                             }, "\uD83D\uDCE7 Upom\u00EDnka"))));
                 }),
