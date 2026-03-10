@@ -2940,8 +2940,8 @@ function App() {
     
     // ── DESKTOP LAYOUT ─────────────────────────────────────────
     return (React.createElement("div", { style: { fontFamily: "'Segoe UI',system-ui,sans-serif", background: "#f5f3ef", minHeight: "100vh", display: "flex" } },
-        React.createElement("div", { style: { width: "220px", background: "#000000", minHeight: "100vh", flexShrink: 0,
-                display: "flex", flexDirection: "column" } },
+        React.createElement("div", { style: { width: "220px", background: "#000000", height: "100vh", flexShrink: 0,
+                position: "fixed", top: 0, left: 0, display: "flex", flexDirection: "column", overflowY: "auto" } },
             React.createElement("div", { style: { padding: "20px 16px", borderBottom: "1px solid rgba(255,255,255,0.15)" } },
                 React.createElement("div", { style: { color: "#ffffff", fontWeight: "700", fontSize: "16px" } }, "🧾 Fakturace CZ"),
                 React.createElement("div", { style: { color: "#c4b5fd", fontSize: "11px", marginTop: "4px" } }, data.firma.nazev || "Nastavte firmu"),
@@ -2982,7 +2982,7 @@ function App() {
                                 border: "1px solid rgba(255, 255, 255, 0.3)", color: "#ffffff", borderRadius: "6px",
                                 fontSize: "11px", cursor: "pointer", fontWeight: "600", textAlign: "center" } }, "📂 Import"),
                         React.createElement("input", { type: "file", accept: ".json", style: { display: "none" }, onChange: e => importFromFile(e.target.files[0], (d) => { updateData(d); notify("Data obnovena!"); }) }))))),
-        React.createElement("div", { style: { flex: 1, overflow: "auto" } },
+        React.createElement("div", { style: { flex: 1, marginLeft: "220px", overflow: "auto" } },
             React.createElement("div", { style: { background: "#fff", padding: "14px 28px", borderBottom: "1px solid #e7e5e0",
                     display: "flex", justifyContent: "space-between", alignItems: "center",
                     position: "sticky", top: 0, zIndex: 100, boxShadow: "0 1px 3px rgba(0,0,0,0.04)" } },
@@ -3125,17 +3125,46 @@ function Dashboard({ data }) {
                 data.faktury.filter(f => f.stav === "vystavena").slice(0, 5).map(f => {
                     const total = calcFakturaTotal(f.polozky || []);
                     const overdue = new Date(f.datumSplatnosti) < new Date();
+                    const hasEmail = f.zakaznikEmail && f.zakaznikEmail.includes('@');
                     return (React.createElement("div", { key: f.id, style: { display: "flex", justifyContent: "space-between",
                             padding: "8px 0", borderBottom: "1px solid #f3f4f6", alignItems: "center" } },
-                        React.createElement("div", null,
+                        React.createElement("div", { style: { flex: 1 } },
                             React.createElement("div", { style: { fontWeight: "600", fontSize: "13px" } }, f.cislo),
                             React.createElement("div", { style: { fontSize: "11px", color: "#6b7280" } },
                                 f.zakaznikNazev,
                                 " \u00B7 splatnost ",
                                 formatDate(f.datumSplatnosti))),
-                        React.createElement("div", { style: { textAlign: "right" } },
-                            React.createElement("div", { style: { fontWeight: "700", color: overdue ? "#dc2626" : "#374151" } }, formatCZK(total.celkem)),
-                            overdue && React.createElement(Badge, { text: "Po splatnosti", color: "red" }))));
+                        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+                            React.createElement("div", { style: { textAlign: "right" } },
+                                React.createElement("div", { style: { fontWeight: "700", color: overdue ? "#dc2626" : "#374151" } }, formatCZK(total.celkem)),
+                                overdue && React.createElement(Badge, { text: "Po splatnosti", color: "red" })),
+                            overdue && hasEmail && React.createElement("button", { 
+                                onClick: async function() {
+                                    if (!isGmailConnected()) {
+                                        notify("\u274C Nejprve p\u0159ipojte Google Drive (zahrnuje Gmail)");
+                                        return;
+                                    }
+                                    try {
+                                        notify("\uD83D\uDCE7 Odes\u00EDl\u00E1m upom\u00EDnku...");
+                                        await sendInvoiceReminder(f, 1, data.firma, data.emailSablonyFaktury, notify);
+                                        notify("\u2705 Upom\u00EDnka odesl\u00E1na!");
+                                    } catch (error) {
+                                        notify("\u274C Chyba: " + error.message);
+                                    }
+                                },
+                                style: { 
+                                    background: "#3b82f6", 
+                                    color: "#fff", 
+                                    border: "none", 
+                                    padding: "6px 12px", 
+                                    borderRadius: "6px", 
+                                    fontSize: "11px", 
+                                    cursor: "pointer",
+                                    fontWeight: "600",
+                                    whiteSpace: "nowrap"
+                                },
+                                title: "Odeslat 1. upom\u00EDnku na email: " + f.zakaznikEmail
+                            }, "\uD83D\uDCE7 Upom\u00EDnka"))));
                 }),
                 data.faktury.filter(f => f.stav === "vystavena").length === 0 && React.createElement("p", { style: { color: "#6b7280", fontSize: "13px" } }, "\u017D\u00E1dn\u00E9 nezaplacen\u00E9 faktury \uD83C\uDF89")),
             React.createElement(Card, null,
@@ -6840,6 +6869,86 @@ function Nastaveni({ data, updateData, notify }) {
                 React.createElement("h3", { style: { marginTop: 0, color: "#166534" } }, "📧 Gmail - Odesílání upomínek"),
                 React.createElement("p", { style: { fontSize: "13px", color: "#166534", marginBottom: "0", lineHeight: "1.6" } },
                     "✅ Gmail je automaticky připojený přes Google Drive. Stačí připojit Drive a můžete odesílat upomínky!")),
+            React.createElement(Card, { style: { marginBottom: "16px", background: "#eff6ff", border: "1px solid #93c5fd" } },
+                React.createElement("h3", { style: { marginTop: 0, color: "#1e40af", cursor: "pointer", userSelect: "none", display: "flex", justifyContent: "space-between", alignItems: "center" }, 
+                    onClick: function() { 
+                        const expanded = localStorage.getItem('emailTemplatesExpanded') === 'true';
+                        localStorage.setItem('emailTemplatesExpanded', (!expanded).toString());
+                        window.location.reload();
+                    } },
+                    "✉️ Emailové šablony upomínek",
+                    React.createElement("span", { style: { fontSize: "18px" } }, 
+                        localStorage.getItem('emailTemplatesExpanded') === 'true' ? "▼" : "▶"
+                    )
+                ),
+                localStorage.getItem('emailTemplatesExpanded') === 'true' && React.createElement("div", null,
+                    React.createElement("p", { style: { fontSize: "13px", color: "#374151", marginBottom: "16px" } },
+                        "Upravte texty upomínek. Dostupné proměnné: ",
+                        React.createElement("code", { style: { background: "#e0e7ff", padding: "2px 6px", borderRadius: "4px", fontSize: "11px" } }, "{CISLO_FAKTURY}"),
+                        ", ",
+                        React.createElement("code", { style: { background: "#e0e7ff", padding: "2px 6px", borderRadius: "4px", fontSize: "11px" } }, "{CASTKA}"),
+                        ", ",
+                        React.createElement("code", { style: { background: "#e0e7ff", padding: "2px 6px", borderRadius: "4px", fontSize: "11px" } }, "{DATUM_SPLATNOSTI}"),
+                        ", ",
+                        React.createElement("code", { style: { background: "#e0e7ff", padding: "2px 6px", borderRadius: "4px", fontSize: "11px" } }, "{VS}"),
+                        ", ",
+                        React.createElement("code", { style: { background: "#e0e7ff", padding: "2px 6px", borderRadius: "4px", fontSize: "11px" } }, "{UCET}")
+                    ),
+                    React.createElement("div", { style: { marginBottom: "16px" } },
+                        React.createElement("label", { style: { display: "block", fontWeight: "600", fontSize: "13px", color: "#1e40af", marginBottom: "6px" } }, "1. upomínka (7 dní po splatnosti)"),
+                        React.createElement("textarea", { 
+                            value: data.emailSablonyFaktury.upominka1,
+                            onChange: function(e) {
+                                updateData(function(prev) {
+                                    return Object.assign({}, prev, {
+                                        emailSablonyFaktury: Object.assign({}, prev.emailSablonyFaktury, {
+                                            upominka1: e.target.value
+                                        })
+                                    });
+                                });
+                            },
+                            style: { width: "100%", minHeight: "180px", padding: "12px", border: "1px solid #bfdbfe", borderRadius: "6px", fontSize: "12px", fontFamily: "monospace", lineHeight: "1.6" }
+                        })
+                    ),
+                    React.createElement("div", { style: { marginBottom: "16px" } },
+                        React.createElement("label", { style: { display: "block", fontWeight: "600", fontSize: "13px", color: "#1e40af", marginBottom: "6px" } }, "2. upomínka (s úroky)"),
+                        React.createElement("textarea", { 
+                            value: data.emailSablonyFaktury.upominka2,
+                            onChange: function(e) {
+                                updateData(function(prev) {
+                                    return Object.assign({}, prev, {
+                                        emailSablonyFaktury: Object.assign({}, prev.emailSablonyFaktury, {
+                                            upominka2: e.target.value
+                                        })
+                                    });
+                                });
+                            },
+                            style: { width: "100%", minHeight: "200px", padding: "12px", border: "1px solid #bfdbfe", borderRadius: "6px", fontSize: "12px", fontFamily: "monospace", lineHeight: "1.6" }
+                        })
+                    ),
+                    React.createElement("div", { style: { marginBottom: "16px" } },
+                        React.createElement("label", { style: { display: "block", fontWeight: "600", fontSize: "13px", color: "#1e40af", marginBottom: "6px" } }, "3. upomínka (předžalobní výzva)"),
+                        React.createElement("textarea", { 
+                            value: data.emailSablonyFaktury.upominka3,
+                            onChange: function(e) {
+                                updateData(function(prev) {
+                                    return Object.assign({}, prev, {
+                                        emailSablonyFaktury: Object.assign({}, prev.emailSablonyFaktury, {
+                                            upominka3: e.target.value
+                                        })
+                                    });
+                                });
+                            },
+                            style: { width: "100%", minHeight: "220px", padding: "12px", border: "1px solid #bfdbfe", borderRadius: "6px", fontSize: "12px", fontFamily: "monospace", lineHeight: "1.6" }
+                        })
+                    ),
+                    React.createElement("div", { style: { marginTop: "16px", padding: "12px", background: "#dbeafe", borderRadius: "6px" } },
+                        React.createElement("p", { style: { margin: 0, fontSize: "12px", color: "#1e40af" } },
+                            "💡 Tip: Změny se ukládají automaticky do Google Drive při každé úpravě."
+                        )
+                    )
+                )
+            ),
             React.createElement(Card, { style: { background: "#f0fdf4", border: "1px solid #86efac" } },
                 React.createElement("h3", { style: { marginTop: 0, color: "#15803d" } },
                     "\u2705 Da\u0148ov\u00E9 parametry \u010CR ",
