@@ -115,8 +115,116 @@ const initialState = {
         zivnostVydal: "",
         zivnostDatum: "",
     },
-    zakaznici: [],
-    faktury: [],
+    zakaznici: [
+        {
+            id: "zak_test_001",
+            nazev: "Test Zákazník s.r.o.",
+            ico: "12345678",
+            dic: "CZ12345678",
+            email: "test@example.com",
+            ulice: "Testovací 123",
+            mesto: "Praha",
+            psc: "110 00",
+            aktivni: true
+        },
+        {
+            id: "zak_test_002",
+            nazev: "Ondřej Testovací",
+            ico: "87654321",
+            dic: "",
+            email: "ondrej.test@gmail.com",
+            ulice: "Zkušební 456",
+            mesto: "Brno",
+            psc: "602 00",
+            aktivni: true
+        }
+    ],
+    faktury: [
+        {
+            id: "fv_test_001",
+            cislo: "FV20260001",
+            datumVystaveni: "2026-02-01",
+            datumSplatnosti: "2026-02-15",
+            datumUskutecneni: "2026-02-01",
+            zakaznikId: "zak_test_001",
+            zakaznikNazev: "Test Zákazník s.r.o.",
+            zakaznikIco: "12345678",
+            zakaznikDic: "CZ12345678",
+            zakaznikEmail: "test@example.com",
+            zakaznikAdresa: "Testovací 123, 110 00 Praha",
+            polozky: [
+                {
+                    id: "pol_001",
+                    typ: "sluzba",
+                    popis: "Webový vývoj",
+                    mnozstvi: 10,
+                    jednotka: "hod",
+                    cena: 1000,
+                    sazba: 21
+                }
+            ],
+            stav: "vystavena",
+            zpusobPlatby: "Převodem",
+            variabilniSymbol: "20260001",
+            poznamka: ""
+        },
+        {
+            id: "fv_test_002",
+            cislo: "FV20260002",
+            datumVystaveni: "2026-02-10",
+            datumSplatnosti: "2026-02-24",
+            datumUskutecneni: "2026-02-10",
+            zakaznikId: "zak_test_002",
+            zakaznikNazev: "Ondřej Testovací",
+            zakaznikIco: "87654321",
+            zakaznikDic: "",
+            zakaznikEmail: "ondrej.test@gmail.com",
+            zakaznikAdresa: "Zkušební 456, 602 00 Brno",
+            polozky: [
+                {
+                    id: "pol_002",
+                    typ: "sluzba",
+                    popis: "Konzultace",
+                    mnozstvi: 5,
+                    jednotka: "hod",
+                    cena: 1500,
+                    sazba: 21
+                }
+            ],
+            stav: "vystavena",
+            zpusobPlatby: "Převodem",
+            variabilniSymbol: "20260002",
+            poznamka: ""
+        },
+        {
+            id: "fv_test_003",
+            cislo: "FV20260003",
+            datumVystaveni: "2026-03-01",
+            datumSplatnosti: "2026-03-15",
+            datumUskutecneni: "2026-03-01",
+            zakaznikId: "zak_test_001",
+            zakaznikNazev: "Test Zákazník s.r.o.",
+            zakaznikIco: "12345678",
+            zakaznikDic: "CZ12345678",
+            zakaznikEmail: "test@example.com",
+            zakaznikAdresa: "Testovací 123, 110 00 Praha",
+            polozky: [
+                {
+                    id: "pol_003",
+                    typ: "sluzba",
+                    popis: "Údržba webu",
+                    mnozstvi: 1,
+                    jednotka: "měsíc",
+                    cena: 5000,
+                    sazba: 21
+                }
+            ],
+            stav: "uhrazena",
+            zpusobPlatby: "Převodem",
+            variabilniSymbol: "20260003",
+            poznamka: ""
+        }
+    ],
     polozkyMaterialy: [],
     majetek: [],
     danNaklady: {},
@@ -3240,6 +3348,7 @@ function Fakturace({ data, updateData, notify, setModal }) {
             zakaznikNazev: "",
             zakaznikIco: "",
             zakaznikDic: "",
+            zakaznikEmail: "",
             zakaznikAdresa: "",
             polozky: [],
             stav: "vystavena",
@@ -3340,7 +3449,14 @@ function FakturaForm({ faktura, zakaznici, firma, onSave, onClose }) {
     const selectZakaznik = (id) => {
         const z = zakaznici.find(x => x.id === id);
         if (z) {
-            setF(prev => (Object.assign(Object.assign({}, prev), { zakaznikId: z.id, zakaznikNazev: z.nazev, zakaznikIco: z.ico, zakaznikDic: z.dic, zakaznikAdresa: `${z.ulice}, ${z.psc} ${z.mesto}` })));
+            setF(prev => (Object.assign(Object.assign({}, prev), { 
+                zakaznikId: z.id, 
+                zakaznikNazev: z.nazev, 
+                zakaznikIco: z.ico, 
+                zakaznikDic: z.dic, 
+                zakaznikEmail: z.email,
+                zakaznikAdresa: `${z.ulice}, ${z.psc} ${z.mesto}` 
+            })));
         }
     };
     const addPolozka = (typ) => {
@@ -3370,8 +3486,9 @@ function FakturaForm({ faktura, zakaznici, firma, onSave, onClose }) {
         React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" } },
             React.createElement("div", null,
                 React.createElement("h4", { style: { marginTop: 0, color: "#1a3a5c" } }, "Z\u00E1kazn\u00EDk"),
-                React.createElement(Select, { label: "Vybrat z\u00E1kazn\u00EDka", value: f.zakaznikId, onChange: selectZakaznik, options: [{ value: "", label: "-- vyberte --" }, ...zakaznici.map(z => ({ value: z.id, label: z.nazev }))] }),
+                React.createElement(Select, { label: "Vybrat z\u00E1kazn\u00EDka", value: f.zakaznikId, onChange: selectZakaznik, options: [{ value: "", label: "-- vyberte --" }].concat(zakaznici.map(function(z) { return { value: z.id, label: z.nazev }; })) }),
                 React.createElement(Input, { label: "N\u00E1zev z\u00E1kazn\u00EDka", value: f.zakaznikNazev, onChange: v => setField("zakaznikNazev", v), required: true }),
+                React.createElement(Input, { label: "Email z\u00E1kazn\u00EDka", value: f.zakaznikEmail || "", onChange: v => setField("zakaznikEmail", v), placeholder: "email@example.com" }),
                 React.createElement(Input, { label: "I\u010CO", value: f.zakaznikIco, onChange: v => setField("zakaznikIco", v) }),
                 React.createElement(Input, { label: "DI\u010C", value: f.zakaznikDic, onChange: v => setField("zakaznikDic", v) }),
                 React.createElement(Input, { label: "Adresa", value: f.zakaznikAdresa, onChange: v => setField("zakaznikAdresa", v) })),
@@ -6853,8 +6970,7 @@ function Nastaveni({ data, updateData, notify, emailTemplatesExpanded, setEmailT
                     label: "\uD83D\uDDD1\uFE0F Vymazat v\u0161echna data",
                     message: "Opravdu smazat v\u0161echna data? Nastaven\u00ED firmy z\u016Fstane.",
                     onConfirm: () => {
-                        updateData(prev => ({
-                            ...prev,
+                        updateData(prev => Object.assign({}, prev, {
                             faktury: [],
                             zakaznici: [],
                             majetek: [],
@@ -6862,9 +6978,18 @@ function Nastaveni({ data, updateData, notify, emailTemplatesExpanded, setEmailT
                             prijateFaktury: [],
                             dodavatele: [],
                             najemnici: [],
-                            nemovitosti: { properties: [] },
+                            nemovitosti: { properties: [] }
                         }));
                         notify("\u2705 Data smazána!");
+                    }
+                }),
+                React.createElement("div", { style: { marginTop: "8px" } }),
+                React.createElement(ConfirmDialog2Btn, {
+                    label: "\uD83E\uDDEA Resetovat na testovac\u00ED data",
+                    message: "Nahradit data testovac\u00EDmi fakturami s emaily? Uv\u00EDd\u00EDte tla\u010D\u00EDtka pro upom\u00EDnky.",
+                    onConfirm: () => {
+                        localStorage.removeItem("fakturace_app_v5");
+                        window.location.reload();
                     }
                 })),
             React.createElement(Card, { style: { marginBottom: "16px", background: "#dcfce7", border: "1px solid #86efac" } },
