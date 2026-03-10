@@ -5803,7 +5803,7 @@ function RForm({ initial, onSave, onBack }) {
         React.createElement(RSH, { label: "P\u0159\u00EDjmy" }),
         React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" } },
             React.createElement(Input, { label: "N\u00E1jemn\u00E9/m\u011Bs", type: "number", value: ((_a = f.income) === null || _a === void 0 ? void 0 : _a.rent) || 0, onChange: v => setInc("rent", v) }),
-            React.createElement(Input, { label: "Ostatn\u00ED/m\u011Bs", type: "number", value: ((_b = f.income) === null || _b === void 0 ? void 0 : _b.other) || 0, onChange: v => setInc("other", v) })),
+            React.createElement(Input, { label: "Ostatn\u00ED p\u0159\u00EDjmy (z\u00E1lohy na energie)/m\u011Bs", type: "number", value: ((_b = f.income) === null || _b === void 0 ? void 0 : _b.other) || 0, onChange: v => setInc("other", v) })),
         React.createElement(RSH, { label: "Z\u00E1lohy na energie (m\u011Bs)" }),
         React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" } },
             React.createElement(Input, { label: "\u26A1 Elekt\u0159ina", type: "number", value: ((_c = f.zaloh) === null || _c === void 0 ? void 0 : _c.elektrina) || 0, onChange: v => setZal("elektrina", v) }),
@@ -5994,24 +5994,44 @@ function RDashboard({ properties, onOpen, onAdd, data, updateData, notify }) {
                         React.createElement("div", { style: { fontSize: "10px", color: "#9ca3af" } }, "Fond oprav"),
                         React.createElement("div", { style: { fontSize: "13px", fontWeight: "700", color: "#d97706" } }, formatCZK(((_e = p.fondOprav) === null || _e === void 0 ? void 0 : _e.mesicne) || 0))),
                     React.createElement("div", null,
-                        React.createElement("div", { style: { fontSize: "10px", color: "#9ca3af" } }, "Stav platby"),
+                        React.createElement("div", { style: { fontSize: "10px", color: "#9ca3af" } }, "Stav platby (aktu\u00E1ln\u00ED m\u011Bs\u00EDc)"),
                         (function() {
                             const mesic = new Date().getMonth() + 1;
                             const rok = new Date().getFullYear();
                             const mesicId = rok + '-' + String(mesic).padStart(2, '0');
                             const platby = (data.platby || []).filter(pl => pl.relatedId === p.id && pl.month === mesicId);
                             const zaplaceno = platby.some(pl => pl.amount >= ((p.income && p.income.rent) || 0));
-                            return React.createElement("div", { 
-                                style: { 
-                                    fontSize: "11px", 
-                                    fontWeight: "700", 
-                                    color: zaplaceno ? "#16a34a" : "#dc2626",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "4px"
-                                } 
-                            }, 
-                                zaplaceno ? "✅ Uhrazeno" : "❌ Čeká"
+                            
+                            // Najdi poslední platbu
+                            const vsechnyPlatby = (data.platby || []).filter(pl => pl.relatedId === p.id);
+                            const serazene = vsechnyPlatby.sort(function(a, b) {
+                                return new Date(b.date) - new Date(a.date);
+                            });
+                            const posledniPlatba = serazene[0];
+                            
+                            return React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "2px" } },
+                                React.createElement("div", { 
+                                    style: { 
+                                        fontSize: "11px", 
+                                        fontWeight: "700", 
+                                        color: zaplaceno ? "#16a34a" : "#dc2626",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "4px"
+                                    } 
+                                }, 
+                                    zaplaceno ? "✅ Uhrazeno" : "❌ Čeká"
+                                ),
+                                React.createElement("div", {
+                                    style: {
+                                        fontSize: "9px",
+                                        color: "#9ca3af",
+                                        marginTop: "2px"
+                                    }
+                                },
+                                    "Posledn\u00ED: ",
+                                    posledniPlatba ? formatDate(posledniPlatba.date) : "Bez platby"
+                                )
                             );
                         })())),
                 (function() {
