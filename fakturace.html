@@ -3307,34 +3307,54 @@ function Dashboard({ data, notify }) {
             
             React.createElement(Card, null,
                 React.createElement("h3", { style: { marginTop: 0, color: "#1a3a5c" } }, "\uD83C\uDFE0 Nezaplacen\u00E9 n\u00E1jmy"),
-                (data.najemnici || []).filter(n => {
-                    const platby = (data.platby || []).filter(p => p.relatedId === n.id);
-                    const mesic = new Date().getMonth() + 1;
-                    const rok = new Date().getFullYear();
+                ((data.nemovitosti && data.nemovitosti.properties) || []).filter(function(p) {
+                    // Jen pronajato
+                    if (p.status !== "pronajato") return false;
+                    
+                    // Aktuální měsíc
+                    const dnes = new Date();
+                    const mesic = dnes.getMonth() + 1;
+                    const rok = dnes.getFullYear();
+                    const den = dnes.getDate();
                     const mesicId = rok + '-' + String(mesic).padStart(2, '0');
-                    const zaplaceno = platby.some(p => p.month === mesicId && p.amount >= (n.rent || 0));
-                    return !zaplaceno;
-                }).slice(0, 5).map(n => {
-                    const overdue = true;
-                    const hasEmail = n.email && n.email.includes('@');
-                    return (React.createElement("div", { key: n.id, style: { display: "flex", justifyContent: "space-between",
+                    
+                    // Kontrola splatnosti - 5. den měsíce
+                    const poSplatnosti = den > 5;
+                    if (!poSplatnosti) return false;  // Ještě není po splatnosti
+                    
+                    // Kontrola platby
+                    const platby = (data.platby || []).filter(function(pl) {
+                        return pl.relatedId === p.id && pl.month === mesicId;
+                    });
+                    
+                    const zaplaceno = platby.some(function(pl) {
+                        return pl.amount >= ((p.income && p.income.rent) || 0);
+                    });
+                    
+                    return !zaplaceno;  // Zobrazí pokud není zaplaceno
+                }).slice(0, 5).map(function(p) {
+                    const hasEmail = (p.tenant && p.tenant.email && p.tenant.email.includes('@'));
+                    const rent = (p.income && p.income.rent) || 0;
+                    const tenantName = (p.tenant && p.tenant.name) || "Bez nájemníka";
+                    
+                    return (React.createElement("div", { key: p.id, style: { display: "flex", justifyContent: "space-between",
                             padding: "8px 0", borderBottom: "1px solid #f3f4f6", alignItems: "center" } },
                         React.createElement("div", { style: { flex: 1 } },
-                            React.createElement("div", { style: { fontWeight: "600", fontSize: "13px" } }, n.name || "Bez jména"),
+                            React.createElement("div", { style: { fontWeight: "600", fontSize: "13px" } }, tenantName),
                             React.createElement("div", { style: { fontSize: "11px", color: "#6b7280" } },
-                                n.propertyName || "Nemovitost",
+                                p.name || "Nemovitost",
                                 " \u00B7 splatnost 5. dne v měsíci"),
-                            !hasEmail && overdue && React.createElement("div", { style: { fontSize: "10px", color: "#ef4444", marginTop: "2px" } }, "\u26A0\uFE0F Chyb\u00ED email n\u00E1jemn\u00EDka")),
+                            !hasEmail && React.createElement("div", { style: { fontSize: "10px", color: "#ef4444", marginTop: "2px" } }, "\u26A0\uFE0F Chyb\u00ED email n\u00E1jemn\u00EDka")),
                         React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
                             React.createElement("div", { style: { textAlign: "right" } },
-                                React.createElement("div", { style: { fontWeight: "700", color: overdue ? "#dc2626" : "#374151" } }, formatCZK(n.rent || 0)),
-                                overdue && React.createElement(Badge, { text: "Nezaplaceno", color: "red" })),
-                            overdue && hasEmail && React.createElement("button", { 
+                                React.createElement("div", { style: { fontWeight: "700", color: "#dc2626" } }, formatCZK(rent)),
+                                React.createElement(Badge, { text: "Po splatnosti", color: "red" })),
+                            hasEmail && React.createElement("button", { 
                                 onClick: function(e) {
                                     e.preventDefault();
                                     e.stopPropagation();
                                     
-                                    console.log('🔵 Tlačítko nájmu kliknuto!', n.name);
+                                    console.log('🔵 Tlačítko nájmu kliknuto!', p.name);
                                     console.log('🔍 isGmailConnected:', isGmailConnected());
                                     
                                     if (!isGmailConnected()) {
@@ -3348,7 +3368,18 @@ function Dashboard({ data, notify }) {
                                     (async function() {
                                         try {
                                             notify("\uD83D\uDCE7 Odes\u00EDl\u00E1m upom\u00EDnku n\u00E1jemn\u00EDkovi...");
-                                            await sendRentalReminder(n, 1, data.platby || [], data.firma, data.emailSablonyNajmy, notify);
+                                            
+                                            // Vytvoř nájemníka pro sendRentalReminder
+                                            const najemnik = {
+                                                id: p.id,
+                                                name: tenantName,
+                                                email: p.tenant.email,
+                                                rent: rent,
+                                                propertyName: p.name,
+                                                propertyAddress: p.address
+                                            };
+                                            
+                                            await sendRentalReminder(najemnik, 1, data.platby || [], data.firma, data.emailSablonyNajmy, notify);
                                             notify("\u2705 Upom\u00EDnka n\u00E1jemn\u00EDkovi odesl\u00E1na!");
                                         } catch (error) {
                                             console.error('❌ Chyba při odesílání:', error);
@@ -3370,15 +3401,24 @@ function Dashboard({ data, notify }) {
                                     zIndex: 10
                                 },
                                 type: "button",
-                                title: "Odeslat 1. upom\u00EDnku na email: " + n.email
+                                title: "Odeslat 1. upom\u00EDnku na email: " + (p.tenant && p.tenant.email)
                             }, "\uD83D\uDCE7 Upom\u00EDnka"))));
                 }),
-                (data.najemnici || []).filter(n => {
-                    const platby = (data.platby || []).filter(p => p.relatedId === n.id);
-                    const mesic = new Date().getMonth() + 1;
-                    const rok = new Date().getFullYear();
+                ((data.nemovitosti && data.nemovitosti.properties) || []).filter(function(p) {
+                    if (p.status !== "pronajato") return false;
+                    const dnes = new Date();
+                    const den = dnes.getDate();
+                    const poSplatnosti = den > 5;
+                    if (!poSplatnosti) return false;
+                    const mesic = dnes.getMonth() + 1;
+                    const rok = dnes.getFullYear();
                     const mesicId = rok + '-' + String(mesic).padStart(2, '0');
-                    const zaplaceno = platby.some(p => p.month === mesicId && p.amount >= (n.rent || 0));
+                    const platby = (data.platby || []).filter(function(pl) {
+                        return pl.relatedId === p.id && pl.month === mesicId;
+                    });
+                    const zaplaceno = platby.some(function(pl) {
+                        return pl.amount >= ((p.income && p.income.rent) || 0);
+                    });
                     return !zaplaceno;
                 }).length === 0 && React.createElement("p", { style: { color: "#6b7280", fontSize: "13px" } }, "\u017D\u00E1dn\u00E9 nezaplacen\u00E9 n\u00E1jmy \uD83C\uDF89")),
             
