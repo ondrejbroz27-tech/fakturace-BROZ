@@ -2338,7 +2338,7 @@ function fileToBase64(file) {
     });
 }
 const GDRIVE_FILE_NAME = "fakturace_cz_data.json";
-const GDRIVE_SCOPES = "https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file";
+const GDRIVE_SCOPES = "https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/gmail.send";
 let gapiLoaded = false;
 let gisLoaded = false;
 let tokenClient = null;
@@ -2366,6 +2366,7 @@ function loadGisScript(cb) {
 async function initGapi() {
     await window.gapi.client.init({});
     await window.gapi.client.load("https://www.googleapis.com/discovery/v1/apis/drive/v3/rest");
+    await window.gapi.client.load("https://www.googleapis.com/discovery/v1/apis/gmail/v1/rest");
     gapiLoaded = true;
 }
 // Find or create file in Drive
@@ -5976,6 +5977,24 @@ function getRentalReminderLevel(najemnik, platby, upominky) {
   return null;
 }
 
+// ============================================================
+// GMAIL API UTILITIES (using existing gapi)
+// ============================================================
+
+function isGmailConnected() {
+  return window.gapi && window.gapi.client && window.gapi.client.getToken && window.gapi.client.getToken();
+}
+
+async function sendGmailEmail(to, subject, body) {
+  if (!isGmailConnected()) {
+    throw new Error('Google Drive není připojen');
+  }
+  const email = ['To: ' + to, 'Subject: ' + subject, 'Content-Type: text/plain; charset=utf-8', '', body].join('\r\n');
+  const encodedEmail = btoa(unescape(encodeURIComponent(email))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const response = await window.gapi.client.gmail.users.messages.send({ userId: 'me', resource: { raw: encodedEmail } });
+  return response.result;
+}
+
 // Substitute variables in email template
 function substituteEmailVariables(template, data) {
   let result = template;
@@ -6024,9 +6043,17 @@ async function sendInvoiceReminder(invoice, level, firma, templates, notify) {
     ? `2. upomínka - Faktura č. ${invoice.cislo}`
     : `PŘEDŽALOBNÍ VÝZVA - Faktura č. ${invoice.cislo}`;
   
-  // TODO: Implement actual Gmail sending
-  // For now, just simulate
-  notify(`📧 Email odeslán: ${subject} → ${invoice.zakaznikEmail}`);
+  if (!isGmailConnected()) {
+    throw new Error('Google Drive není připojen');
+  }
+  
+  try {
+    await sendGmailEmail(invoice.zakaznikEmail, subject, emailBody);
+    notify(`✅ Email odeslán: ${subject} → ${invoice.zakaznikEmail}`);
+  } catch (error) {
+    notify(`❌ Chyba: ${error.message}`);
+    throw error;
+  }
   
   return {
     id: generateId(),
@@ -6081,7 +6108,17 @@ async function sendRentalReminder(najemnik, level, platby, firma, templates, not
     ? `2. upomínka - Nájemné ${monthName}`
     : `VÝZVA K ÚHRADĚ NÁJEMNÉHO - Možnost okamžité výpovědi`;
   
-  notify(`📧 Email odeslán: ${subject} → ${najemnik.email}`);
+  if (!isGmailConnected()) {
+    throw new Error('Google Drive není připojen');
+  }
+  
+  try {
+    await sendGmailEmail(najemnik.email, subject, emailBody);
+    notify(`✅ Email odeslán: ${subject} → ${najemnik.email}`);
+  } catch (error) {
+    notify(`❌ Chyba: ${error.message}`);
+    throw error;
+  }
   
   return {
     id: generateId(),
@@ -6799,6 +6836,10 @@ function Nastaveni({ data, updateData, notify }) {
                         notify("\u2705 Data smazána!");
                     }
                 })),
+            React.createElement(Card, { style: { marginBottom: "16px", background: "#dcfce7", border: "1px solid #86efac" } },
+                React.createElement("h3", { style: { marginTop: 0, color: "#166534" } }, "📧 Gmail - Odesílání upomínek"),
+                React.createElement("p", { style: { fontSize: "13px", color: "#166534", marginBottom: "0", lineHeight: "1.6" } },
+                    "✅ Gmail je automaticky připojený přes Google Drive. Stačí připojit Drive a můžete odesílat upomínky!")),
             React.createElement(Card, { style: { background: "#f0fdf4", border: "1px solid #86efac" } },
                 React.createElement("h3", { style: { marginTop: 0, color: "#15803d" } },
                     "\u2705 Da\u0148ov\u00E9 parametry \u010CR ",
