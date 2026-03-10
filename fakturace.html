@@ -6153,7 +6153,18 @@ async function sendGmailEmail(to, subject, body) {
   if (!isGmailConnected()) {
     throw new Error('Google Drive není připojen');
   }
-  const email = ['To: ' + to, 'Subject: ' + subject, 'Content-Type: text/plain; charset=utf-8', '', body].join('\r\n');
+  
+  // Encode subject with MIME encoded-word for Czech characters
+  const encodedSubject = '=?UTF-8?B?' + btoa(unescape(encodeURIComponent(subject))) + '?=';
+  
+  const email = [
+    'To: ' + to,
+    'Subject: ' + encodedSubject,
+    'Content-Type: text/plain; charset=utf-8',
+    '',
+    body
+  ].join('\r\n');
+  
   const encodedEmail = btoa(unescape(encodeURIComponent(email))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   const response = await window.gapi.client.gmail.users.messages.send({ userId: 'me', resource: { raw: encodedEmail } });
   return response.result;
