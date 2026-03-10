@@ -316,66 +316,77 @@ IČ: {ICO}`
     emailSablonyNajmy: {
         upominka1: `Dobrý den,
 
-obracím se na Vás ve věci úhrady nájemného za měsíc {MESIC} ve výši {CASTKA}.
+dne {DATUM_SMLOUVY} jsme uzavřeli smlouvu o nájmu bytu/domu na adrese {ADRESA_NEMOVITOSTI} podle § 2201 a násl. zákona č. 89/2012 Sb., občanského zákoníku.
 
-Dle nájemní smlouvy mělo být nájemné uhrazeno do {DATUM_SPLATNOSTI}. K dnešnímu dni jsme platbu neobdrželi.
+Při kontrole plateb jsem zjistil/a, že jste mi nezaplatil/a nájemné za měsíc {MESIC} ve výši {CASTKA}, které mělo být uhrazeno do {DATUM_SPLATNOSTI}.
 
-V souladu s § 2228 občanského zákoníku Vás tímto vyzývám k úhradě dlužného nájemného do {LHUTA} dnů.
+V souladu s § 2228, odst. 4 ve spojení s § 2228, odst. 1 a 2 občanského zákoníku Vás tímto vyzývám k úhradě dlužného nájemného do {LHUTA} dnů od doručení této výzvy.
+
+Upozorňuji Vás, že pokud nebude nájemné uhrazeno v uvedené lhůtě, vznikne mi právo vypovědět nájem bez výpovědní doby podle § 2228, odst. 2 občanského zákoníku.
 
 Platbu prosím uhraďte na účet: {UCET}
-
-Děkuji za pochopení.
+Variabilní symbol: {VS}
 
 S pozdravem,
 {JMENO_PRONAJIMATEL}
 {EMAIL}
 {TELEFON}`,
 
-        upominka2: `UPOMÍNKA - NEZAPLACENÉ NÁJEMNÉ
+        upominka2: `DRUHÁ UPOMÍNKA - NEZAPLACENÉ NÁJEMNÉ
 
 Dobrý den,
 
-dne {DATUM_UPOMINKY1} jsem Vás upozornil/a na nezaplacené nájemné za měsíc {MESIC} ve výši {CASTKA}.
+dne {DATUM_UPOMINKY1} jsem Vás vyzval/a k úhradě dlužného nájemného za měsíc {MESIC} ve výši {CASTKA}.
 
-K dnešnímu dni jsme platbu stále neobdrželi.
+K dnešnímu dni jsme platbu stále neobdrželi, což představuje porušení Vaší povinnosti podle § 2228 občanského zákoníku.
 
-V souladu s § 2228 občanského zákoníku Vás tímto opětovně vyzývám k úhradě dlužného nájemného do {LHUTA} dnů.
+Tímto Vás **podruhé a naposledy** vyzývám k úhradě celé dlužné částky do {LHUTA} dnů od doručení této výzvy.
 
-UPOZORNĚNÍ: Pokud nebude dlužné nájemné uhrazeno, jsem oprávněn/a postupovat podle § 2288 a § 2291 občanského zákoníku, což může vést k ukončení nájemního vztahu.
+UPOZORNĚNÍ: Pokud nebude nájemné uhrazeno v uvedené lhůtě, budu nucen/a:
+1. Využít práva na výpověď nájmu bez výpovědní doby podle § 2228 odst. 2 a § 2291 občanského zákoníku
+2. Případně podat návrh na vyklizení bytu
 
 Dlužná částka: {CASTKA}
-Platbu uhraďte na účet: {UCET}
+Účet: {UCET}
+Variabilní symbol: {VS}
 
 S pozdravem,
 {JMENO_PRONAJIMATEL}
 {EMAIL}
 {TELEFON}`,
 
-        upominkaVypoved: `VÝZVA K ÚHRADĚ DLUŽNÉHO NÁJEMNÉHO - UPOZORNĚNÍ NA MOŽNOST OKAMŽITÉ VÝPOVĚDI
+        upominkaVypoved: `PŘEDŽALOBNÍ VÝZVA - VÝPOVĚĎ Z NÁJMU
 
 Dobrý den,
 
-v souladu s § 2291 odst. 2 zákona č. 89/2012 Sb., občanského zákoníku, Vás tímto vyzývám k úhradě dlužného nájemného.
+dne {DATUM_SMLOUVY} jsme uzavřeli smlouvu o nájmu bytu/domu na adrese {ADRESA_NEMOVITOSTI}.
 
-Dlužné nájemné:
-{MESICE_DLUHU}
-CELKEM: {CASTKA}
+Opakovaně jste porušil/a povinnost hradit nájemné. K dnešnímu dni eviduji neuhrazené nájemné za měsíc {MESIC} ve výši {CASTKA}.
 
-Tato výzva je zasílána jako poslední upozornění před podáním výpovědi z nájmu bez výpovědní doby podle § 2291 odst. 1 občanského zákoníku.
+Již jste byl/a upozorněn/a v upomínkách ze dne {DATUM_UPOMINKY1} a {DATUM_UPOMINKY2}.
 
-Poskytuj Vám přiměřenou lhůtu {LHUTA} dnů k úhradě dlužného nájemného.
+**POSLEDNÍ VÝZVA K ÚHRADĚ**
 
-UPOZORNĚNÍ: Pokud nebude dlužné nájemné v této lhůtě uhrazeno, jsem oprávněn/a podat okamžitou výpověď z nájmu bez výpovědní doby. V takovém případě je nájemce povinen odevzdat byt/nemovitost bez zbytečného odkladu, nejpozději do 1 měsíce od skončení nájmu.
+V souladu s § 2291, odst. 1 písm. b) občanského zákoníku (neplacení nájemného za dobu alespoň tří měsíců) Vám tímto dávám výpověď z nájmu bytu bez výpovědní doby.
 
-Platbu uhraďte na účet: {UCET}
+Pokud uhradíte celou dlužnou částku do {LHUTA} dnů od doručení této výzvy, může být výpověď odvrácena.
+
+V opačném případě budu postupovat podle § 2291 občanského zákoníku, což zahrnuje:
+- Ukončení nájemního vztahu bez výpovědní doby
+- Podání návrhu na vyklizení bytu u soudu
+- Vymáhání dlužného nájemného soudní cestou
+
+Dlužná částka: {CASTKA}
+Účet: {UCET}
+Variabilní symbol: {VS}
+
+Žádám Vás o neprodlené vyřešení této situace.
 
 S pozdravem,
 {JMENO_PRONAJIMATEL}
 {EMAIL}
 {TELEFON}
-IČ: {ICO}
-
-Příloha: Kopie nájemní smlouvy`
+IČO: {ICO}`
     },
 }
 // ============================================================
@@ -3293,6 +3304,84 @@ function Dashboard({ data, notify }) {
                             }, "\uD83D\uDCE7 Upom\u00EDnka"))));
                 }),
                 data.faktury.filter(f => f.stav === "vystavena").length === 0 && React.createElement("p", { style: { color: "#6b7280", fontSize: "13px" } }, "\u017D\u00E1dn\u00E9 nezaplacen\u00E9 faktury \uD83C\uDF89")),
+            
+            React.createElement(Card, null,
+                React.createElement("h3", { style: { marginTop: 0, color: "#1a3a5c" } }, "\uD83C\uDFE0 Nezaplacen\u00E9 n\u00E1jmy"),
+                (data.najemnici || []).filter(n => {
+                    const platby = (data.platby || []).filter(p => p.relatedId === n.id);
+                    const mesic = new Date().getMonth() + 1;
+                    const rok = new Date().getFullYear();
+                    const mesicId = rok + '-' + String(mesic).padStart(2, '0');
+                    const zaplaceno = platby.some(p => p.month === mesicId && p.amount >= (n.rent || 0));
+                    return !zaplaceno;
+                }).slice(0, 5).map(n => {
+                    const overdue = true;
+                    const hasEmail = n.email && n.email.includes('@');
+                    return (React.createElement("div", { key: n.id, style: { display: "flex", justifyContent: "space-between",
+                            padding: "8px 0", borderBottom: "1px solid #f3f4f6", alignItems: "center" } },
+                        React.createElement("div", { style: { flex: 1 } },
+                            React.createElement("div", { style: { fontWeight: "600", fontSize: "13px" } }, n.name || "Bez jména"),
+                            React.createElement("div", { style: { fontSize: "11px", color: "#6b7280" } },
+                                n.propertyName || "Nemovitost",
+                                " \u00B7 splatnost 5. dne v měsíci"),
+                            !hasEmail && overdue && React.createElement("div", { style: { fontSize: "10px", color: "#ef4444", marginTop: "2px" } }, "\u26A0\uFE0F Chyb\u00ED email n\u00E1jemn\u00EDka")),
+                        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+                            React.createElement("div", { style: { textAlign: "right" } },
+                                React.createElement("div", { style: { fontWeight: "700", color: overdue ? "#dc2626" : "#374151" } }, formatCZK(n.rent || 0)),
+                                overdue && React.createElement(Badge, { text: "Nezaplaceno", color: "red" })),
+                            overdue && hasEmail && React.createElement("button", { 
+                                onClick: function(e) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    
+                                    console.log('🔵 Tlačítko nájmu kliknuto!', n.name);
+                                    console.log('🔍 isGmailConnected:', isGmailConnected());
+                                    
+                                    if (!isGmailConnected()) {
+                                        console.log('❌ Gmail není připojen');
+                                        notify("\u274C Nejprve p\u0159ipojte Google Drive (zahrnuje Gmail)");
+                                        return;
+                                    }
+                                    
+                                    console.log('✅ Gmail připojen, odesílám...');
+                                    
+                                    (async function() {
+                                        try {
+                                            notify("\uD83D\uDCE7 Odes\u00EDl\u00E1m upom\u00EDnku n\u00E1jemn\u00EDkovi...");
+                                            await sendRentalReminder(n, 1, data.platby || [], data.firma, data.emailSablonyNajmy, notify);
+                                            notify("\u2705 Upom\u00EDnka n\u00E1jemn\u00EDkovi odesl\u00E1na!");
+                                        } catch (error) {
+                                            console.error('❌ Chyba při odesílání:', error);
+                                            notify("\u274C Chyba: " + error.message);
+                                        }
+                                    })();
+                                },
+                                style: { 
+                                    background: "#10b981", 
+                                    color: "#fff", 
+                                    border: "none", 
+                                    padding: "6px 12px", 
+                                    borderRadius: "6px", 
+                                    fontSize: "11px", 
+                                    cursor: "pointer",
+                                    fontWeight: "600",
+                                    whiteSpace: "nowrap",
+                                    position: "relative",
+                                    zIndex: 10
+                                },
+                                type: "button",
+                                title: "Odeslat 1. upom\u00EDnku na email: " + n.email
+                            }, "\uD83D\uDCE7 Upom\u00EDnka"))));
+                }),
+                (data.najemnici || []).filter(n => {
+                    const platby = (data.platby || []).filter(p => p.relatedId === n.id);
+                    const mesic = new Date().getMonth() + 1;
+                    const rok = new Date().getFullYear();
+                    const mesicId = rok + '-' + String(mesic).padStart(2, '0');
+                    const zaplaceno = platby.some(p => p.month === mesicId && p.amount >= (n.rent || 0));
+                    return !zaplaceno;
+                }).length === 0 && React.createElement("p", { style: { color: "#6b7280", fontSize: "13px" } }, "\u017D\u00E1dn\u00E9 nezaplacen\u00E9 n\u00E1jmy \uD83C\uDF89")),
+            
             React.createElement(Card, null,
                 React.createElement("h3", { style: { marginTop: 0, color: "#1a3a5c" } },
                     "\uD83D\uDCCA P\u0159ehled DPH ",
@@ -5766,7 +5855,7 @@ function RForm({ initial, onSave, onBack }) {
                 initial.name ? "Uložit změny" : "Přidat nemovitost"))));
 }
 // ── Dashboard ──
-function RDashboard({ properties, onOpen, onAdd }) {
+function RDashboard({ properties, onOpen, onAdd, data, updateData, notify }) {
     const thisYear = new Date().getFullYear();
     const [histRok, setHistRok] = (0, useState)(thisYear);
     const [showHistPicker, setShowHistPicker] = (0, useState)(false);
@@ -5892,7 +5981,7 @@ function RDashboard({ properties, onOpen, onAdd }) {
                             fontSize: "10px", fontWeight: "700", whiteSpace: "nowrap" } }, p.status)),
                 alerts.length > 0 && (React.createElement("div", { style: { display: "flex", gap: "6px", marginBottom: "8px", flexWrap: "wrap" } }, alerts.map(a => (React.createElement("span", { key: a, style: { fontSize: "10px", background: "#fffbeb", border: "1px solid #fcd34d",
                         color: "#d97706", padding: "2px 8px", borderRadius: "6px", fontWeight: "600" } }, a))))),
-                React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginBottom: "10px" } },
+                React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "8px", marginBottom: "10px" } },
                     React.createElement("div", null,
                         React.createElement("div", { style: { fontSize: "10px", color: "#9ca3af" } }, "N\u00E1jemn\u00E9"),
                         React.createElement("div", { style: { fontSize: "13px", fontWeight: "700", color: "#4f46e5" } }, formatCZK(((_d = p.income) === null || _d === void 0 ? void 0 : _d.rent) || 0))),
@@ -5903,7 +5992,87 @@ function RDashboard({ properties, onOpen, onAdd }) {
                             formatCZK(cf))),
                     React.createElement("div", null,
                         React.createElement("div", { style: { fontSize: "10px", color: "#9ca3af" } }, "Fond oprav"),
-                        React.createElement("div", { style: { fontSize: "13px", fontWeight: "700", color: "#d97706" } }, formatCZK(((_e = p.fondOprav) === null || _e === void 0 ? void 0 : _e.mesicne) || 0)))),
+                        React.createElement("div", { style: { fontSize: "13px", fontWeight: "700", color: "#d97706" } }, formatCZK(((_e = p.fondOprav) === null || _e === void 0 ? void 0 : _e.mesicne) || 0))),
+                    React.createElement("div", null,
+                        React.createElement("div", { style: { fontSize: "10px", color: "#9ca3af" } }, "Stav platby"),
+                        (function() {
+                            const mesic = new Date().getMonth() + 1;
+                            const rok = new Date().getFullYear();
+                            const mesicId = rok + '-' + String(mesic).padStart(2, '0');
+                            const platby = (data.platby || []).filter(pl => pl.relatedId === p.id && pl.month === mesicId);
+                            const zaplaceno = platby.some(pl => pl.amount >= ((p.income && p.income.rent) || 0));
+                            return React.createElement("div", { 
+                                style: { 
+                                    fontSize: "11px", 
+                                    fontWeight: "700", 
+                                    color: zaplaceno ? "#16a34a" : "#dc2626",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "4px"
+                                } 
+                            }, 
+                                zaplaceno ? "✅ Uhrazeno" : "❌ Čeká"
+                            );
+                        })())),
+                (function() {
+                    const mesic = new Date().getMonth() + 1;
+                    const rok = new Date().getFullYear();
+                    const mesicId = rok + '-' + String(mesic).padStart(2, '0');
+                    const platby = (data.platby || []).filter(pl => pl.relatedId === p.id && pl.month === mesicId);
+                    const zaplaceno = platby.some(pl => pl.amount >= ((p.income && p.income.rent) || 0));
+                    
+                    if (zaplaceno) return null;
+                    
+                    return React.createElement("div", { style: { marginBottom: "10px" } },
+                        React.createElement("button", {
+                            onClick: function(e) {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                
+                                if (!confirm("Označit nájemné za " + mesicId + " jako uhrazeno (hotovost)?")) {
+                                    return;
+                                }
+                                
+                                const novaPlatba = {
+                                    id: "manual_" + Date.now(),
+                                    date: new Date().toISOString().split('T')[0],
+                                    amount: (p.income && p.income.rent) || 0,
+                                    vs: p.id,
+                                    note: "Manuálně označeno - hotovost",
+                                    relatedId: p.id,
+                                    month: mesicId,
+                                    type: "manual"
+                                };
+                                
+                                updateData(function(prev) {
+                                    return Object.assign({}, prev, {
+                                        platby: [].concat(prev.platby || [], [novaPlatba])
+                                    });
+                                });
+                                
+                                notify("✅ Nájemné označeno jako uhrazeno");
+                            },
+                            style: {
+                                width: "100%",
+                                padding: "6px 12px",
+                                background: "#dcfce7",
+                                border: "1px solid #86efac",
+                                borderRadius: "6px",
+                                fontSize: "11px",
+                                fontWeight: "600",
+                                color: "#15803d",
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: "6px"
+                            },
+                            type: "button"
+                        },
+                        "✅ Označit jako uhrazeno (hotovost)"
+                        )
+                    );
+                })(),
                 React.createElement("div", { style: { height: "6px", background: "#f3f4f6", borderRadius: "3px", overflow: "hidden", display: "flex" } },
                     React.createElement("div", { style: { width: `${Math.min(Math.max(ltv, 0), 100)}%`, background: "linear-gradient(90deg,#dc2626,#f87171)" } }),
                     React.createElement("div", { style: { flex: 1, background: "linear-gradient(90deg,#86efac,#16a34a)" } })),
@@ -5969,7 +6138,7 @@ function Nemovitosti({ data, updateData, notify }) {
         return React.createElement(RDetail, { p: selProp, onBack: showList, onEdit: () => showEdit(selProp), onDelete: () => handleDelete(selProp.id), onUpdate: handleUpdate, notify: notify });
     }
     // LIST / DASHBOARD (default)
-    return React.createElement(RDashboard, { properties: allProps, onOpen: showDetail, onAdd: showAdd });
+    return React.createElement(RDashboard, { properties: allProps, onOpen: showDetail, onAdd: showAdd, data: data, updateData: updateData, notify: notify });
 }
 // ============================================================
 // // NASTAVENI
@@ -7101,6 +7270,86 @@ function Nastaveni({ data, updateData, notify, emailTemplatesExpanded, setEmailT
                     )
                 )
             ),
+            
+            React.createElement(Card, { style: { marginBottom: "16px", background: "#f0fdf4", border: "1px solid #86efac" } },
+                React.createElement("h3", { style: { marginTop: 0, color: "#15803d", cursor: "pointer", userSelect: "none", display: "flex", justifyContent: "space-between", alignItems: "center" }, 
+                    onClick: function() { 
+                        setEmailTemplatesExpanded(!emailTemplatesExpanded);
+                    } },
+                    "\uD83C\uDFE0 Emailov\u00E9 \u0161ablony - N\u00E1jemn\u00E9",
+                    React.createElement("span", { style: { fontSize: "18px" } }, 
+                        emailTemplatesExpanded ? "▼" : "▶"
+                    )
+                ),
+                emailTemplatesExpanded && React.createElement("div", null,
+                    React.createElement("p", { style: { fontSize: "13px", color: "#374151", marginBottom: "16px" } },
+                        "Upravte texty upom\u00EDnek pro n\u00E1jemn\u00EDky. Dostupn\u00E9 prom\u011Bnn\u00E9: ",
+                        React.createElement("code", { style: { background: "#dcfce7", padding: "2px 6px", borderRadius: "4px", fontSize: "11px" } }, "{MESIC}"),
+                        ", ",
+                        React.createElement("code", { style: { background: "#dcfce7", padding: "2px 6px", borderRadius: "4px", fontSize: "11px" } }, "{CASTKA}"),
+                        ", ",
+                        React.createElement("code", { style: { background: "#dcfce7", padding: "2px 6px", borderRadius: "4px", fontSize: "11px" } }, "{DATUM_SPLATNOSTI}"),
+                        ", ",
+                        React.createElement("code", { style: { background: "#dcfce7", padding: "2px 6px", borderRadius: "4px", fontSize: "11px" } }, "{UCET}"),
+                        ", ",
+                        React.createElement("code", { style: { background: "#dcfce7", padding: "2px 6px", borderRadius: "4px", fontSize: "11px" } }, "{VS}")
+                    ),
+                    React.createElement("div", { style: { marginBottom: "16px" } },
+                        React.createElement("label", { style: { display: "block", fontWeight: "600", fontSize: "13px", color: "#15803d", marginBottom: "6px" } }, "1. upom\u00EDnka (\u00A7 2228 O\u010C)"),
+                        React.createElement("textarea", { 
+                            value: data.emailSablonyNajmy.upominka1,
+                            onChange: function(e) {
+                                updateData(function(prev) {
+                                    return Object.assign({}, prev, {
+                                        emailSablonyNajmy: Object.assign({}, prev.emailSablonyNajmy, {
+                                            upominka1: e.target.value
+                                        })
+                                    });
+                                });
+                            },
+                            style: { width: "100%", minHeight: "200px", padding: "12px", border: "1px solid #86efac", borderRadius: "6px", fontSize: "12px", fontFamily: "monospace", lineHeight: "1.6" }
+                        })
+                    ),
+                    React.createElement("div", { style: { marginBottom: "16px" } },
+                        React.createElement("label", { style: { display: "block", fontWeight: "600", fontSize: "13px", color: "#15803d", marginBottom: "6px" } }, "2. upom\u00EDnka (druh\u00E1 v\u00FDzva)"),
+                        React.createElement("textarea", { 
+                            value: data.emailSablonyNajmy.upominka2,
+                            onChange: function(e) {
+                                updateData(function(prev) {
+                                    return Object.assign({}, prev, {
+                                        emailSablonyNajmy: Object.assign({}, prev.emailSablonyNajmy, {
+                                            upominka2: e.target.value
+                                        })
+                                    });
+                                });
+                            },
+                            style: { width: "100%", minHeight: "220px", padding: "12px", border: "1px solid #86efac", borderRadius: "6px", fontSize: "12px", fontFamily: "monospace", lineHeight: "1.6" }
+                        })
+                    ),
+                    React.createElement("div", { style: { marginBottom: "16px" } },
+                        React.createElement("label", { style: { display: "block", fontWeight: "600", fontSize: "13px", color: "#15803d", marginBottom: "6px" } }, "3. v\u00FDzva (\u00A7 2291 O\u010C - v\u00FDpov\u011B\u010F)"),
+                        React.createElement("textarea", { 
+                            value: data.emailSablonyNajmy.upominkaVypoved,
+                            onChange: function(e) {
+                                updateData(function(prev) {
+                                    return Object.assign({}, prev, {
+                                        emailSablonyNajmy: Object.assign({}, prev.emailSablonyNajmy, {
+                                            upominkaVypoved: e.target.value
+                                        })
+                                    });
+                                });
+                            },
+                            style: { width: "100%", minHeight: "260px", padding: "12px", border: "1px solid #86efac", borderRadius: "6px", fontSize: "12px", fontFamily: "monospace", lineHeight: "1.6" }
+                        })
+                    ),
+                    React.createElement("div", { style: { marginTop: "16px", padding: "12px", background: "#dcfce7", borderRadius: "6px" } },
+                        React.createElement("p", { style: { margin: 0, fontSize: "12px", color: "#15803d" } },
+                            "\u2696\uFE0F Upom\u00EDnky jsou dle \u010Desk\u00E9ho ob\u010Dansk\u00E9ho z\u00E1kon\u00EDku (\u00A7 2228, \u00A7 2291)"
+                        )
+                    )
+                )
+            ),
+            
             React.createElement(Card, { style: { background: "#f0fdf4", border: "1px solid #86efac" } },
                 React.createElement("h3", { style: { marginTop: 0, color: "#15803d" } },
                     "\u2705 Da\u0148ov\u00E9 parametry \u010CR ",
