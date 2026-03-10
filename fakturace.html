@@ -2834,6 +2834,7 @@ function App() {
     const [activeSubTab, setActiveSubTab] = (0, useState)(null);
     const [modal, setModal] = (0, useState)(null);
     const [notification, setNotification] = (0, useState)(null);
+    const [emailTemplatesExpanded, setEmailTemplatesExpanded] = (0, useState)(false);
     
     const notify = (msg, type = "success") => {
         setNotification({ msg, type });
@@ -2892,7 +2893,7 @@ function App() {
         activeTab === "najemnici" && React.createElement(NajemniciGlobal, { data: data, updateData: updateData, notify: notify, setActiveTab: setActiveTab }),
         activeTab === "majetek" && React.createElement(Majetek, { data: data, updateData: updateData, notify: notify }),
         activeTab === "nemovitosti" && React.createElement(Nemovitosti, { data: data, updateData: updateData, notify: notify }),
-        activeTab === "nastaveni" && React.createElement(Nastaveni, { data: data, updateData: updateData, notify: notify })));
+        activeTab === "nastaveni" && React.createElement(Nastaveni, { data: data, updateData: updateData, notify: notify, emailTemplatesExpanded: emailTemplatesExpanded, setEmailTemplatesExpanded: setEmailTemplatesExpanded })));
     // ── MOBILE LAYOUT ──────────────────────────────────────────
     if (isMobile) {
         return (React.createElement("div", { style: { fontFamily: "'Segoe UI',system-ui,sans-serif", background: "#f5f3ef",
@@ -3133,7 +3134,8 @@ function Dashboard({ data }) {
                             React.createElement("div", { style: { fontSize: "11px", color: "#6b7280" } },
                                 f.zakaznikNazev,
                                 " \u00B7 splatnost ",
-                                formatDate(f.datumSplatnosti))),
+                                formatDate(f.datumSplatnosti)),
+                            !hasEmail && overdue && React.createElement("div", { style: { fontSize: "10px", color: "#ef4444", marginTop: "2px" } }, "\u26A0\uFE0F Chyb\u00ED email z\u00E1kazn\u00EDka")),
                         React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
                             React.createElement("div", { style: { textAlign: "right" } },
                                 React.createElement("div", { style: { fontWeight: "700", color: overdue ? "#dc2626" : "#374151" } }, formatCZK(total.celkem)),
@@ -6745,7 +6747,7 @@ function PaymentsPanel({ data, updateData, notify }) {
   );
 }
 
-function Nastaveni({ data, updateData, notify }) {
+function Nastaveni({ data, updateData, notify, emailTemplatesExpanded, setEmailTemplatesExpanded }) {
     const [firma, setFirma] = (0, useState)(data.firma);
     const [geminiKey, setGeminiKey] = (0, useState)(() => { try { return localStorage.getItem("gemini_api_key") || ""; } catch(e) { return ""; } });
     const [showKey, setShowKey] = (0, useState)(false);
@@ -6872,16 +6874,14 @@ function Nastaveni({ data, updateData, notify }) {
             React.createElement(Card, { style: { marginBottom: "16px", background: "#eff6ff", border: "1px solid #93c5fd" } },
                 React.createElement("h3", { style: { marginTop: 0, color: "#1e40af", cursor: "pointer", userSelect: "none", display: "flex", justifyContent: "space-between", alignItems: "center" }, 
                     onClick: function() { 
-                        const expanded = localStorage.getItem('emailTemplatesExpanded') === 'true';
-                        localStorage.setItem('emailTemplatesExpanded', (!expanded).toString());
-                        window.location.reload();
+                        setEmailTemplatesExpanded(!emailTemplatesExpanded);
                     } },
                     "✉️ Emailové šablony upomínek",
                     React.createElement("span", { style: { fontSize: "18px" } }, 
-                        localStorage.getItem('emailTemplatesExpanded') === 'true' ? "▼" : "▶"
+                        emailTemplatesExpanded ? "▼" : "▶"
                     )
                 ),
-                localStorage.getItem('emailTemplatesExpanded') === 'true' && React.createElement("div", null,
+                emailTemplatesExpanded && React.createElement("div", null,
                     React.createElement("p", { style: { fontSize: "13px", color: "#374151", marginBottom: "16px" } },
                         "Upravte texty upomínek. Dostupné proměnné: ",
                         React.createElement("code", { style: { background: "#e0e7ff", padding: "2px 6px", borderRadius: "4px", fontSize: "11px" } }, "{CISLO_FAKTURY}"),
