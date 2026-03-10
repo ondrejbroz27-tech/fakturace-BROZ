@@ -2991,7 +2991,7 @@ function App() {
         { id: "nastaveni", icon: "⚙️", label: "Nast." },
     ];
     const renderContent = () => (React.createElement(React.Fragment, null,
-        activeTab === "dashboard" && React.createElement(Dashboard, { data: data }),
+        activeTab === "dashboard" && React.createElement(Dashboard, { data: data, notify: notify }),
         activeTab === "fakturace" && React.createElement(Fakturace, { data: data, updateData: updateData, notify: notify, setModal: setModal }),
         activeTab === "payments" && React.createElement(PaymentsPanel, { data: data, updateData: updateData, notify: notify }),
         activeTab === "zakaznici" && React.createElement(Zakaznici, { data: data, updateData: updateData, notify: notify }),
@@ -3104,7 +3104,7 @@ function App() {
 // ============================================================
 // DASHBOARD
 // ============================================================
-function Dashboard({ data }) {
+function Dashboard({ data, notify }) {
     const rok = new Date().getFullYear();
     const mesic = new Date().getMonth() + 1;
     const fakturyRok = data.faktury.filter(f => new Date(f.datumVystaveni).getFullYear() === rok && f.stav !== "stornována");
