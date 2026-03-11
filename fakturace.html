@@ -6710,8 +6710,8 @@ function PaymentsPanel({ data, updateData, notify }) {
     try {
       const trans = await fetchFioTransactions(
         fioToken, 
-        convertToFioDateFormat(dateFrom), 
-        convertToFioDateFormat(dateTo)
+        dateFrom,  // Už je ve správném formátu YYYY-MM-DD
+        dateTo     // Už je ve správném formátu YYYY-MM-DD
       );
       
       setTransactions(trans);
