@@ -2953,7 +2953,8 @@ function App() {
     const [activeSubTab, setActiveSubTab] = (0, useState)(null);
     const [modal, setModal] = (0, useState)(null);
     const [notification, setNotification] = (0, useState)(null);
-    const [emailTemplatesExpanded, setEmailTemplatesExpanded] = (0, useState)(false);
+    const [emailTemplatesExpandedFaktury, setEmailTemplatesExpandedFaktury] = (0, useState)(false);
+    const [emailTemplatesExpandedNajmy, setEmailTemplatesExpandedNajmy] = (0, useState)(false);
     
     const notify = (msg, type = "success") => {
         setNotification({ msg, type });
@@ -3012,7 +3013,15 @@ function App() {
         activeTab === "najemnici" && React.createElement(NajemniciGlobal, { data: data, updateData: updateData, notify: notify, setActiveTab: setActiveTab }),
         activeTab === "majetek" && React.createElement(Majetek, { data: data, updateData: updateData, notify: notify }),
         activeTab === "nemovitosti" && React.createElement(Nemovitosti, { data: data, updateData: updateData, notify: notify }),
-        activeTab === "nastaveni" && React.createElement(Nastaveni, { data: data, updateData: updateData, notify: notify, emailTemplatesExpanded: emailTemplatesExpanded, setEmailTemplatesExpanded: setEmailTemplatesExpanded })));
+        activeTab === "nastaveni" && React.createElement(Nastaveni, { 
+            data: data, 
+            updateData: updateData, 
+            notify: notify, 
+            emailTemplatesExpandedFaktury: emailTemplatesExpandedFaktury, 
+            setEmailTemplatesExpandedFaktury: setEmailTemplatesExpandedFaktury,
+            emailTemplatesExpandedNajmy: emailTemplatesExpandedNajmy,
+            setEmailTemplatesExpandedNajmy: setEmailTemplatesExpandedNajmy
+        })));
     // ── MOBILE LAYOUT ──────────────────────────────────────────
     if (isMobile) {
         return (React.createElement("div", { style: { fontFamily: "'Segoe UI',system-ui,sans-serif", background: "#f5f3ef",
@@ -6699,6 +6708,8 @@ function PaymentsPanel({ data, updateData, notify }) {
   const fileInputRef = useRef(null);
   const aiInputRef = useRef(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [lastFioRequest, setLastFioRequest] = useState(0);
+  const [fioCountdown, setFioCountdown] = useState(0);
   
   async function loadTransactions() {
     if (!fioToken) {
@@ -6706,7 +6717,31 @@ function PaymentsPanel({ data, updateData, notify }) {
       return;
     }
     
+    // Throttling ochrana - Fio povoluje max 1 request za 30s
+    const now = Date.now();
+    const timeSinceLastRequest = (now - lastFioRequest) / 1000;
+    const minInterval = 30; // sekund
+    
+    if (timeSinceLastRequest < minInterval && lastFioRequest > 0) {
+      const waitTime = Math.ceil(minInterval - timeSinceLastRequest);
+      notify(`⏱️ Počkejte ještě ${waitTime} sekund. Fio API povoluje max 1 požadavek za 30 sekund.`, 'error');
+      return;
+    }
+    
     setLoading(true);
+    setLastFioRequest(now);
+    
+    // Spustit odpočítávání
+    let countdown = minInterval;
+    const countdownInterval = setInterval(function() {
+      countdown--;
+      setFioCountdown(countdown);
+      if (countdown <= 0) {
+        clearInterval(countdownInterval);
+        setFioCountdown(0);
+      }
+    }, 1000);
+    
     try {
       const trans = await fetchFioTransactions(
         fioToken, 
@@ -6718,7 +6753,12 @@ function PaymentsPanel({ data, updateData, notify }) {
       autoMatchPayments(trans);
       notify(`✅ Načteno ${trans.length} transakcí z Fio API`);
     } catch (error) {
-      notify('❌ Chyba při načítání z Fio API: ' + error.message, 'error');
+      const errorMsg = error.message;
+      if (errorMsg.includes('409')) {
+        notify('❌ Fio API: Příliš mnoho požadavků. Počkejte 30 sekund a zkuste znovu.', 'error');
+      } else {
+        notify('❌ Chyba při načítání z Fio API: ' + errorMsg, 'error');
+      }
     }
     setLoading(false);
   }
@@ -6911,8 +6951,10 @@ function PaymentsPanel({ data, updateData, notify }) {
           })
         ),
         React.createElement('div', { style: { display: 'flex', alignItems: 'flex-end' } },
-          React.createElement(Btn, { onClick: loadTransactions, disabled: loading },
-            loading ? '⏳ Načítám...' : '🔄 Načíst'
+          React.createElement(Btn, { onClick: loadTransactions, disabled: loading || fioCountdown > 0 },
+            loading ? '⏳ Načítám...' : 
+            fioCountdown > 0 ? `⏱️ Čekejte ${fioCountdown}s` : 
+            '🔄 Načíst'
           )
         )
       ),
@@ -7120,7 +7162,7 @@ function PaymentsPanel({ data, updateData, notify }) {
   );
 }
 
-function Nastaveni({ data, updateData, notify, emailTemplatesExpanded, setEmailTemplatesExpanded }) {
+function Nastaveni({ data, updateData, notify, emailTemplatesExpandedFaktury, setEmailTemplatesExpandedFaktury, emailTemplatesExpandedNajmy, setEmailTemplatesExpandedNajmy }) {
     const [firma, setFirma] = (0, useState)(data.firma);
     const [geminiKey, setGeminiKey] = (0, useState)(() => { try { return localStorage.getItem("gemini_api_key") || ""; } catch(e) { return ""; } });
     const [showKey, setShowKey] = (0, useState)(false);
@@ -7255,14 +7297,14 @@ function Nastaveni({ data, updateData, notify, emailTemplatesExpanded, setEmailT
             React.createElement(Card, { style: { marginBottom: "16px", background: "#eff6ff", border: "1px solid #93c5fd" } },
                 React.createElement("h3", { style: { marginTop: 0, color: "#1e40af", cursor: "pointer", userSelect: "none", display: "flex", justifyContent: "space-between", alignItems: "center" }, 
                     onClick: function() { 
-                        setEmailTemplatesExpanded(!emailTemplatesExpanded);
+                        setEmailTemplatesExpandedFaktury(!emailTemplatesExpandedFaktury);
                     } },
                     "✉️ Emailové šablony upomínek",
                     React.createElement("span", { style: { fontSize: "18px" } }, 
-                        emailTemplatesExpanded ? "▼" : "▶"
+                        emailTemplatesExpandedFaktury ? "▼" : "▶"
                     )
                 ),
-                emailTemplatesExpanded && React.createElement("div", null,
+                emailTemplatesExpandedFaktury && React.createElement("div", null,
                     React.createElement("p", { style: { fontSize: "13px", color: "#374151", marginBottom: "16px" } },
                         "Upravte texty upomínek. Dostupné proměnné: ",
                         React.createElement("code", { style: { background: "#e0e7ff", padding: "2px 6px", borderRadius: "4px", fontSize: "11px" } }, "{CISLO_FAKTURY}"),
@@ -7334,14 +7376,14 @@ function Nastaveni({ data, updateData, notify, emailTemplatesExpanded, setEmailT
             React.createElement(Card, { style: { marginBottom: "16px", background: "#f0fdf4", border: "1px solid #86efac" } },
                 React.createElement("h3", { style: { marginTop: 0, color: "#15803d", cursor: "pointer", userSelect: "none", display: "flex", justifyContent: "space-between", alignItems: "center" }, 
                     onClick: function() { 
-                        setEmailTemplatesExpanded(!emailTemplatesExpanded);
+                        setEmailTemplatesExpandedNajmy(!emailTemplatesExpandedNajmy);
                     } },
                     "\uD83C\uDFE0 Emailov\u00E9 \u0161ablony - N\u00E1jemn\u00E9",
                     React.createElement("span", { style: { fontSize: "18px" } }, 
-                        emailTemplatesExpanded ? "▼" : "▶"
+                        emailTemplatesExpandedNajmy ? "▼" : "▶"
                     )
                 ),
-                emailTemplatesExpanded && React.createElement("div", null,
+                emailTemplatesExpandedNajmy && React.createElement("div", null,
                     React.createElement("p", { style: { fontSize: "13px", color: "#374151", marginBottom: "16px" } },
                         "Upravte texty upom\u00EDnek pro n\u00E1jemn\u00EDky. Dostupn\u00E9 prom\u011Bnn\u00E9: ",
                         React.createElement("code", { style: { background: "#dcfce7", padding: "2px 6px", borderRadius: "4px", fontSize: "11px" } }, "{MESIC}"),
